@@ -52,6 +52,7 @@ function errorResponse(message, status, code) {
 function failureResponse(error) {
   if (isKanbanError(error)) {
     const code = error.code
+    if (code === 'kanban/session-conflict') return errorResponse(error.message, 409, code)
     if (code.endsWith('-not-found')) return errorResponse(error.message, 404, code)
     if (code === 'kanban/body-too-large') {
       return errorResponse(error.message, 413, code)
@@ -228,7 +229,7 @@ export function registerKanbanRoutes(ctx, store) {
       methods: ['POST'],
       handler: guard(store, async (request) => {
         const body = await readJsonObject(request)
-        const task = await store.link(body.id, body.sessionId)
+        const task = await store.link(body.id, body.sessionId, body.expectedSessionId)
         return jsonResponse({ ok: true, task })
       }),
     },

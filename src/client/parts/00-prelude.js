@@ -6,6 +6,7 @@
  * must not redeclare a name that already exists.
  */
 const React = require('react')
+const DshUI = require('@deepseek-ai/dsh-client-ui-primitives')
 const {
   Fragment,
   useState,

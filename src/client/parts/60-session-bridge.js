@@ -22,6 +22,18 @@ addDict(
     'bridge.prompt.tags': '标签：{tags}',
     'bridge.prompt.description': '任务描述：',
     'bridge.prompt.request': '请直接开始执行这个任务，完成后给出结果摘要；必要时先列出计划再动手。',
+    'bridge.prompt.discuss': '先讨论这个任务：提出需要澄清的问题或建议方案，等待我确认后再执行。讨论阶段不要修改文件或运行命令。',
+    'send.title': '发送任务',
+    'send.destination': '发送到',
+    'send.new': '新建会话',
+    'send.current': '当前会话',
+    'send.linked': '关联会话',
+    'send.mode': '发送方式',
+    'send.execute': '直接执行',
+    'send.discuss': '先讨论',
+    'send.submit': '发送',
+    'send.unavailable': '会话已变更或不可用，请重新选择。',
+    'send.relink': '发送后，任务将关联到所选会话。',
     'bridge.sessionTitle': '[任务] {title}',
     'bridge.link.title': '该会话属于任务：{title}',
     'bridge.link.label': '任务',
@@ -51,6 +63,18 @@ addDict(
     'bridge.prompt.tags': 'Tags: {tags}',
     'bridge.prompt.description': 'Task description:',
     'bridge.prompt.request': 'Start working on this task now and finish with a result summary; lay out a short plan first when useful.',
+    'bridge.prompt.discuss': 'Discuss the task first: ask clarifying questions or propose an approach, then wait for my confirmation. Do not change files or run commands during discussion.',
+    'send.title': 'Send task',
+    'send.destination': 'Destination',
+    'send.new': 'New session',
+    'send.current': 'Current session',
+    'send.linked': 'Linked session',
+    'send.mode': 'Send mode',
+    'send.execute': 'Execute now',
+    'send.discuss': 'Discuss first',
+    'send.submit': 'Send',
+    'send.unavailable': 'The session changed or is unavailable. Choose a destination again.',
+    'send.relink': 'Sending will link the task to the selected session.',
     'bridge.sessionTitle': '[Task] {title}',
     'bridge.link.title': 'This session belongs to the task: {title}',
     'bridge.link.label': 'Task',
@@ -91,10 +115,10 @@ function bridgeLookup(taskId) {
  * @param {object | null} workspace
  * @returns {string}
  */
-function buildTaskBrief(task, workspace) {
+function buildTaskBrief(task, workspace, mode) {
   const lines = []
-  lines.push(t('bridge.prompt.title'))
-  lines.push('')
+  if (mode !== 'discuss') lines.push(t('bridge.prompt.title'))
+  if (lines.length) lines.push('')
   lines.push(t('bridge.prompt.task', { title: task.title }))
   if (workspace !== null) {
     lines.push(t('bridge.prompt.workspace', { title: workspace.title, path: workspace.path }))
@@ -112,7 +136,7 @@ function buildTaskBrief(task, workspace) {
     lines.push(task.description.trim())
   }
   lines.push('')
-  lines.push(t('bridge.prompt.request'))
+  lines.push(t(mode === 'discuss' ? 'bridge.prompt.discuss' : 'bridge.prompt.request'))
   return lines.join('\n')
 }
 
@@ -129,8 +153,7 @@ async function promptSession(ctx, sessionId, text, title) {
   try {
     await reference.ready
     const session = reference.binding.session
-    const renamed = await session.rename(t('bridge.sessionTitle', { title: title }))
-    void renamed
+    if (title) await session.rename(t('bridge.sessionTitle', { title }))
     const result = await session.prompt([{ type: 'text', text }], 'queue')
     if (result !== undefined && result !== null && result.ok === false) {
       const message = result.error && result.error.message ? result.error.message : String(result.error)
@@ -185,46 +208,66 @@ async function ensureBoardWorkspace(task) {
   return workspaceId
 }
 
-/**
- * Create (or reuse) a session in the task's workspace, link it to the card and
- * send the task brief. The board calls this from the card's run button.
- * @param {object} task
- * @returns {Promise<string | null>} the session id, or null when cancelled
- */
-async function runTaskInNewSession(task) {
-  if (kanbanStore === null) throw new Error(t('bridge.error.noWorkspace'))
+// The main-view reference survives opening the board. Workspace membership
+// and archive state come from the same public catalogs used by the DSH sidebar.
+function dispatchDestinations(task) {
+  const ctx = kanbanStore.ctx
+  const sessions = ctx.sessions.list.getSnapshot()
+  const workspaces = ctx.workspaces.list.getSnapshot()
+  const members = workspaces.items.find((workspace) => workspace.workspaceId === task.workspaceId)?.sessionIds || []
+  const tasks = kanbanStore.getSnapshot().tasks
+  const destinations = []
+  for (const id of members) {
+    const session = sessions.byId[id]
+    if (!session || workspaces.archivedSessionIds.includes(id)) continue
+    if (tasks.some((other) => other.id !== task.id && other.sessionId === id)) continue
+    const linked = id === task.sessionId
+    if (!linked && !session.retainedBy?.mainView) continue
+    destinations.push({
+      value: id, label: t(linked ? 'send.linked' : 'send.current'),
+      title: session.displayTitle || id,
+    })
+  }
+  destinations.push({ value: 'new', label: t('send.new') })
+  return destinations
+}
+
+async function dispatchTask(task, destination, mode) {
   const ctx = kanbanStore.ctx
   const found = bridgeLookup(task.id)
-  if (found === null) throw new Error(t('bridge.error.noWorkspace'))
-
+  if (!found || found.task.archived || found.task.status === 'done' ||
+      found.task.sessionId !== task.sessionId) throw new Error(t('send.unavailable'))
+  if (destination !== 'new' && !dispatchDestinations(found.task).some((item) => item.value === destination)) {
+    throw new Error(t('send.unavailable'))
+  }
   const workspaceId = await ensureBoardWorkspace(found.task)
   if (workspaceId === null) return null
   const refreshed = bridgeLookup(task.id)
-  const promptTask = refreshed !== null ? refreshed.task : found.task
-  const workspace = refreshed !== null ? refreshed.workspace : found.workspace
-
-  let sessionId
-  try {
-    sessionId = await ctx.uiWorkspace.connectWorkspace(workspaceId)
-    if (typeof sessionId !== 'string' || sessionId === '') throw new Error(t('api.badResponse'))
-  } catch (error) {
-    throw new Error(t('bridge.error.create', { message: messageOf(error) }))
+  if (!refreshed) throw new Error(t('send.unavailable'))
+  let sessionId = destination
+  if (destination === 'new') {
+    try {
+      sessionId = await ctx.sessions.create({ workspaceId })
+      if (!sessionId) throw new Error(t('api.badResponse'))
+    } catch (error) {
+      throw new Error(t('bridge.error.create', { message: messageOf(error) }))
+    }
   }
-
   try {
-    await kanbanStore.linkSession(promptTask.id, sessionId)
+    await kanbanStore.linkSession(task.id, sessionId, task.sessionId)
   } catch (error) {
     throw new Error(t('bridge.error.link', { message: messageOf(error) }))
   }
   try {
-    await promptSession(ctx, sessionId, buildTaskBrief(promptTask, workspace), promptTask.title)
+    const brief = buildTaskBrief(refreshed.task, refreshed.workspace, mode)
+    await promptSession(ctx, sessionId, brief, destination === 'new' ? refreshed.task.title : null)
   } catch (error) {
     throw new Error(t('bridge.error.prompt', { message: messageOf(error) }))
   }
-  const current = taskById(kanbanStore.getSnapshot(), promptTask.id)
-  if (current !== null && current.status === 'todo') {
+  const current = taskById(kanbanStore.getSnapshot(), task.id)
+  if (mode === 'execute' && current?.status === 'todo') {
     try {
-      await kanbanStore.moveTask(promptTask.id, 'doing')
+      await kanbanStore.moveTask(task.id, 'doing')
     } catch (error) {
       kanbanStore.toast(t('bridge.error.move', { message: messageOf(error) }), 'error')
       return sessionId
@@ -234,24 +277,59 @@ async function runTaskInNewSession(task) {
   return sessionId
 }
 
-/**
- * Open the session linked to a task, creating one when the task is an AI task
- * without a session yet.
- * @param {string} taskId
- * @returns {Promise<void>}
- */
-async function openTaskSession(taskId) {
-  const found = bridgeLookup(taskId)
-  if (found === null) return
-  const { task } = found
-  if (typeof task.sessionId === 'string' && task.sessionId !== '') {
-    kanbanStore.ctx.uiWorkspace.openSession(task.sessionId)
-    return
+function TaskSendDialog({ task, onClose }) {
+  const destinations = dispatchDestinations(task)
+  const initial = destinations.some((item) => item.value === task.sessionId) ? task.sessionId : 'new'
+  const [destination, setDestination] = useState(initial)
+  const [mode, setMode] = useState('execute')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const pending = useRef(false)
+  const selected = destinations.find((item) => item.value === destination)
+  async function send() {
+    if (pending.current) return
+    pending.current = true
+    setBusy(true)
+    setError('')
+    try {
+      await dispatchTask(task, destination, mode)
+      onClose()
+    } catch (failure) {
+      setError(messageOf(failure))
+    } finally {
+      pending.current = false
+      setBusy(false)
+    }
   }
-  if (task.assignee && task.assignee.kind === 'ai') {
-    await runTaskInNewSession(task)
-  }
+  return h(DshUI.Modal, {
+    open: true, title: t('send.title'), closeLabel: t('common.close'),
+    onClose: () => { if (!pending.current) onClose() },
+    footer: h('div', { className: 'kbn-send-footer' },
+      h(DshUI.Button, { variant: 'ghost', disabled: busy, onClick: onClose }, t('common.cancel')),
+      h(DshUI.Button, { variant: 'primary', disabled: busy || !selected, onClick: send }, t('send.submit'))),
+  }, h('div', { className: 'kbn-send-form' },
+    h('strong', null, task.title),
+    h('span', null, t('send.destination')),
+    h(DshUI.SegmentedControl, {
+      id: 'kbn-destination', label: t('send.destination'), value: destination,
+      options: destinations, onChange: setDestination, disabled: busy,
+    }),
+    selected?.title && h('div', { className: 'kbn-send-note' }, selected.title),
+    task.sessionId && destination !== task.sessionId && h('div', { className: 'kbn-send-note' }, t('send.relink')),
+    h('span', null, t('send.mode')),
+    h(DshUI.SegmentedControl, {
+      id: 'kbn-mode', label: t('send.mode'), value: mode, onChange: setMode, disabled: busy,
+      options: ['execute', 'discuss'].map((value) => ({ value, label: t('send.' + value) })),
+    }),
+    error && h('p', { role: 'alert', className: 'kbn-editor-error' }, error)))
 }
+
+addStyle(`
+.kbn-send-form { display: grid; gap: 10px; overflow-wrap: anywhere; }
+.kbn-send-form > strong { margin-bottom: 6px; }
+.kbn-send-note { color: var(--dsw-alias-label-secondary); }
+.kbn-send-footer { display: flex; justify-content: flex-end; gap: 8px; }
+`)
 
 /**
  * Apply the same archive state to the session and the card. If a card reply

@@ -855,6 +855,7 @@ export class KanbanStore {
     return this._changeTasks(({ tasks }) => {
       const task = this._requireTask(tasks, id)
       const next = applyTaskPatch(task, patch)
+      if (next.sessionId !== task.sessionId) this._checkSessionAvailable(tasks, task, next.sessionId)
       const previousStatus = task.status
       Object.assign(task, next)
       task.updatedAt = new Date().toISOString()
@@ -968,16 +969,27 @@ export class KanbanStore {
     })
   }
 
+  _checkSessionAvailable(tasks, task, sessionId) {
+    if (sessionId && tasks.some((other) => other.id !== task.id && other.sessionId === sessionId)) {
+      throw kanbanError('kanban/session-conflict', 'This session is already linked to another task.')
+    }
+  }
+
   /**
    * Link (or clear) the execution session of one task.
    * @param {unknown} id
    * @param {unknown} sessionId
    * @returns {Promise<object>}
    */
-  async link(id, sessionId) {
+  async link(id, sessionId, expectedSessionId) {
     return this._changeTasks(({ tasks }) => {
       const task = this._requireTask(tasks, id)
-      task.sessionId = normalizeSessionId(sessionId)
+      if (expectedSessionId !== undefined && task.sessionId !== expectedSessionId) {
+        throw kanbanError('kanban/session-conflict', 'The task is now linked to a different session.')
+      }
+      const target = normalizeSessionId(sessionId)
+      this._checkSessionAvailable(tasks, task, target)
+      task.sessionId = target
       task.updatedAt = new Date().toISOString()
       return cloneTask(task)
     })

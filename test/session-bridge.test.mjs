@@ -31,10 +31,12 @@ function bridgeFixture({ fail, status = 'todo' } = {}) {
     getSnapshot: () => ({ tasks: [task] }),
     ctx: {
       uiWorkspace: {
-        async connectWorkspace() { record('connect'); return 's1' },
         openSession() { record('open') },
       },
+      workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws', sessionIds: ['current'] }], archivedSessionIds: [] }) } },
       sessions: {
+        list: { getSnapshot: () => ({ byId: { current: { retainedBy: { mainView: 1 }, displayTitle: 'My session' } } }) },
+        async create() { record('connect'); return 's1' },
         retain: () => ({ ready: Promise.resolve(), binding: { session }, release: () => record('release') }),
       },
     },
@@ -53,7 +55,7 @@ function bridgeFixture({ fail, status = 'todo' } = {}) {
     addStyle() {},
   })
   vm.runInContext(source, bridge)
-  return { run: () => bridge.runTaskInNewSession(task), task, calls, toasts, store, bridge, record }
+  return { run: (destination = 'new', mode = 'execute') => bridge.dispatchTask(task, destination, mode), task, calls, toasts, store, bridge, record }
 }
 
 test('a rejected link stops dispatch before the first prompt', async () => {
@@ -85,6 +87,22 @@ test('successful dispatch advances a To do card and then opens the session', asy
   assert.equal(await run(), 's1')
   assert.deepEqual(calls, ['connect', 'link', 'rename', 'prompt', 'release', 'move', 'open'])
   assert.equal(task.status, 'doing')
+})
+
+test('discussion in the current session preserves its name and leaves the card in To do', async () => {
+  const { run, task, calls, bridge } = bridgeFixture()
+  assert.equal(await run('current', 'discuss'), 'current')
+  assert.deepEqual(calls, ['link', 'prompt', 'release', 'open'])
+  assert.equal(task.status, 'todo')
+  const brief = bridge.buildTaskBrief(task, null, 'discuss')
+  assert.match(brief, /bridge.prompt.discuss/)
+  assert.doesNotMatch(brief, /bridge.prompt.request/)
+})
+
+test('a destination outside the workspace cannot receive a prompt', async () => {
+  const { run, calls } = bridgeFixture()
+  await assert.rejects(run('other', 'execute'), /send.unavailable/)
+  assert.deepEqual(calls, [])
 })
 
 function archiveFixture(target, { cardFails, sessionFails, lostReply, readFails, undoFails, initialSessionState = !target } = {}) {

@@ -304,9 +304,9 @@ function createKanbanStore(ctx) {
    * @param {string | null} sessionId
    * @returns {Promise<object>} the updated task
    */
-  async function linkSession(id, sessionId) {
+  async function linkSession(id, sessionId, expectedSessionId) {
     const body = await apiPost(KANBAN_API_PATHS.link, {
-      id,
+      id, expectedSessionId,
       sessionId: typeof sessionId === 'string' && sessionId !== '' ? sessionId : null,
     })
     const task = body !== null ? body.task : null

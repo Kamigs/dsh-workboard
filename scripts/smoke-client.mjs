@@ -347,8 +347,18 @@ vm.runInContext(instrumented, sandbox, { filename: 'lib/client.js' })
 if (definition === null) throw new Error('smoke: bundle did not register a ModuleLoader factory')
 if (definition.id !== 'dsh-workboard') throw new Error('smoke: bundle id is ' + definition.id)
 
+const nativeUI = {
+  Button: ({ children, icon, ...props }) => React.createElement('button', props, icon, children),
+  Modal: ({ open, title, children, footer }) => open
+    ? React.createElement('section', { role: 'dialog' }, title, children, footer) : null,
+  SegmentedControl: ({ options, value, onChange }) => options.map((option) => React.createElement('button', {
+    'aria-selected': option.value === value, onClick: () => onChange(option.value),
+  }, option.label)),
+}
+
 const plugin = definition.factory((specifier) => {
   if (specifier === 'react') return React
+  if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return nativeUI
   throw new Error('smoke: unexpected require(' + specifier + ')')
 })
 if (typeof plugin.apply !== 'function') throw new Error('smoke: client half has no apply()')
@@ -636,8 +646,8 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(detail.includes('kbn-detail-edit'), 'detail pane is missing the corner edit button')
   check(detail.includes('kbn-detail-head-actions'), 'detail header actions group missing')
   check(!detail.includes('>编辑<'), 'detail footer must no longer contain the edit button')
-  check(detail.includes('开会话执行'), 'detail footer lost the run action')
-  check(detail.indexOf('删除') < detail.indexOf('开会话执行'), 'the primary run action must be the rightmost button')
+  check(detail.includes('发送到会话'), 'detail footer lost the run action')
+  check(detail.indexOf('删除') < detail.indexOf('发送到会话'), 'the primary run action must be the rightmost button')
   const detailHuman = render(test.TaskDetailPanel, {
     task: Object.assign({}, tasks[1], { id: 'task_me', assignee: { kind: 'human', name: '' } }),
     workspace: workspaceA, busy: false,

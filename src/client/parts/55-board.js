@@ -37,9 +37,9 @@ addDict(
     'detail.previewAttachment': '预览 {name}',
     'detail.previewHint': '点大图放大；视频与其他文件在右侧栏预览。',
     'detail.noSession': '这个任务还没有关联会话',
-    'detail.aiHint': 'AI 任务可以开会话执行，执行后会话会关联回这张卡片。',
+    'detail.aiHint': 'AI 任务可以发送到会话，执行后会话会关联回这张卡片。',
     'detail.edit': '编辑',
-    'detail.run': '开会话执行',
+    'detail.run': '发送到会话',
     'detail.archive': '归档',
     'detail.delete': '删除',
     'detail.deleteConfirm': '再点一次删除',
@@ -88,7 +88,7 @@ addDict(
     'detail.noSession': 'This task has no session yet',
     'detail.aiHint': 'AI tasks can run in a session; the session links back to this card.',
     'detail.edit': 'Edit',
-    'detail.run': 'Run in session',
+    'detail.run': 'Send to session',
     'detail.archive': 'Archive',
     'detail.delete': 'Delete',
     'detail.deleteConfirm': 'Click again to delete',
@@ -179,7 +179,7 @@ let kbnLastWorkspaceId = null
 /**
  * Create a standalone board. A board does not need a working directory; the
  * directory is requested the first time one of its AI tasks is sent to a
- * session (handled by `runTaskInNewSession`).
+ * session (handled by `dispatchTask`).
  * @param {{ open: boolean, onClose: (board?: object) => void }} props
  * @returns {object} React element
  */
@@ -485,6 +485,7 @@ function BoardPage(props) {
   const store = kanbanStore
   const state = store.use((snapshot) => snapshot)
   const [workspaceId, setWorkspaceId] = useState(kbnLastWorkspaceId)
+  const [sendTask, setSendTask] = useState(null)
   const [editor, setEditor] = useState(null)
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [boardOpen, setBoardOpen] = useState(false)
@@ -712,30 +713,8 @@ function BoardPage(props) {
     }
   }
 
-  async function handleRunTask(task) {
-    if (typeof runTaskInNewSession !== 'function') return
-    setBusyTaskId(task.id)
-    try {
-      await runTaskInNewSession(task)
-    } catch (error) {
-      kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
-    } finally {
-      setBusyTaskId(null)
-    }
-  }
-
   function handleOpenSession(task) {
-    if (typeof openTaskSession !== 'function') return
-    try {
-      const result = openTaskSession(task.id)
-      if (result !== null && result !== undefined && typeof result.catch === 'function') {
-        result.catch((error) => {
-          kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
-        })
-      }
-    } catch (error) {
-      kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
-    }
+    if (task.sessionId) kanbanStore.ctx.uiWorkspace.openSession(task.sessionId)
   }
 
   async function handleDeleteTask(task) {
@@ -918,7 +897,7 @@ function BoardPage(props) {
           selected: selectedTaskId === task.id,
           busy: busyTaskId === task.id,
           onEdit: openEdit,
-          onRun: handleRunTask,
+          onRun: setSendTask,
           onOpenSession: handleOpenSession,
           onArchive: handleArchiveTask,
           onDelete: handleDeleteTask,
@@ -1102,7 +1081,7 @@ function BoardPage(props) {
           busy: selectedTask !== null && busyTaskId === selectedTask.id,
           onClose: () => setSelectedTaskId(null),
           onEdit: openEdit,
-          onRun: handleRunTask,
+          onRun: setSendTask,
           onOpenSession: handleOpenSession,
           onArchive: handleArchiveTask,
           onDelete: handleDeleteTask,
@@ -1110,6 +1089,7 @@ function BoardPage(props) {
         }))),
       h(AttachmentPreviewRail, { preview, onClose: () => setPreview(null) }),
 
+    sendTask && h(TaskSendDialog, { key: sendTask.id, task: sendTask, onClose: () => setSendTask(null) }),
     h(ArchiveDialog, { open: archiveOpen, onClose: () => setArchiveOpen(false) }),
     h(TaskEditorDialog, {
       open: editorOpen,
