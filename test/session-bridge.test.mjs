@@ -108,7 +108,8 @@ test('a destination outside the workspace cannot receive a prompt', async () => 
 
 test('single-field task content survives reopening and is sent once', () => {
   const { bridge, task } = bridgeFixture()
-  for (const text of ['Only a title', 'Heading\nA detailed paragraph.\n\nSecond paragraph.', '长'.repeat(205)]) {
+  for (const text of ['Only a title', 'Heading\nA detailed paragraph.\n\nSecond paragraph.',
+    'Heading\n\n    code block', 'Heading\nHeading\nDetails', '长'.repeat(205)]) {
     const fields = bridge.taskContentFields(text)
     assert.ok(fields.title.length <= 200)
     assert.equal(bridge.taskContentText(fields), text)
