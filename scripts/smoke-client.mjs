@@ -584,7 +584,7 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
     open: true, mode: 'create', task: null, workspaceId: 'ws-a', onClose() {}, onSaved() {},
   })
   check(editorCreate.includes('kbn-dialog'), 'task editor dialog did not open')
-  check(editorCreate.includes('kbn-input'), 'task editor is missing its title input')
+  check(editorCreate.includes('aria-label="任务内容"'), 'task editor is missing its task content field')
 
   const editorEdit = render(test.TaskEditorDialog, {
     open: true, mode: 'edit', task: tasks[0], workspaceId: 'ws-a', onClose() {}, onSaved() {},
@@ -602,7 +602,7 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(editorCreate.includes('https://example.com/avatar.png'), 'the account card must show the avatar')
   check(!editorEdit.includes('kbn-account-card'), 'an AI assignee must not show the account card')
   check(!editorCreate.includes('data-icon="true"'), 'icon-less inputs must not reserve icon padding')
-  check(editorCreate.includes('class="kbn-input"'), 'task editor title input missing')
+  check(!editorCreate.includes('aria-label="标题"'), 'task editor should only ask for content once')
   check(!editorCreate.includes('kbn-input-wrap" data-icon'), 'icon-less inputs still reserve icon padding')
   check(editorCreate.includes('data-select="true"'), 'selects must keep their own wrap marker')
   check(editorCreate.includes('data-side="right"'), 'select chevron must stay on the right')

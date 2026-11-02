@@ -119,7 +119,7 @@ function buildTaskBrief(task, workspace, mode) {
   const lines = []
   if (mode !== 'discuss') lines.push(t('bridge.prompt.title'))
   if (lines.length) lines.push('')
-  lines.push(t('bridge.prompt.task', { title: task.title }))
+  lines.push(t('bridge.prompt.task', { title: taskContentText(task) }))
   if (workspace !== null) {
     lines.push(t('bridge.prompt.workspace', { title: workspace.title, path: workspace.path }))
   }
@@ -129,11 +129,6 @@ function buildTaskBrief(task, workspace, mode) {
   if (task.dueDate !== null) lines.push(t('bridge.prompt.due', { date: task.dueDate }))
   if (Array.isArray(task.tags) && task.tags.length > 0) {
     lines.push(t('bridge.prompt.tags', { tags: task.tags.join('、') }))
-  }
-  if (typeof task.description === 'string' && task.description.trim() !== '') {
-    lines.push('')
-    lines.push(t('bridge.prompt.description'))
-    lines.push(task.description.trim())
   }
   lines.push('')
   lines.push(t(mode === 'discuss' ? 'bridge.prompt.discuss' : 'bridge.prompt.request'))

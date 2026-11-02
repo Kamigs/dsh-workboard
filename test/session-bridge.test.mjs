@@ -54,6 +54,7 @@ function bridgeFixture({ fail, status = 'todo' } = {}) {
     addDict() {},
     addStyle() {},
   })
+  vm.runInContext(readFileSync(new URL('../src/client/parts/45-task-editor.js', import.meta.url), 'utf8'), bridge)
   vm.runInContext(source, bridge)
   return { run: (destination = 'new', mode = 'execute') => bridge.dispatchTask(task, destination, mode), task, calls, toasts, store, bridge, record }
 }
@@ -103,6 +104,17 @@ test('a destination outside the workspace cannot receive a prompt', async () => 
   const { run, calls } = bridgeFixture()
   await assert.rejects(run('other', 'execute'), /send.unavailable/)
   assert.deepEqual(calls, [])
+})
+
+test('single-field task content survives reopening and is sent once', () => {
+  const { bridge, task } = bridgeFixture()
+  for (const text of ['Only a title', 'Heading\nA detailed paragraph.\n\nSecond paragraph.', '长'.repeat(205)]) {
+    const fields = bridge.taskContentFields(text)
+    assert.ok(fields.title.length <= 200)
+    assert.equal(bridge.taskContentText(fields), text)
+    assert.equal(bridge.buildTaskBrief({ ...task, ...fields }, null, 'execute').split(text).length, 2)
+  }
+  assert.equal(bridge.taskContentText({ title: 'Old title', description: 'Old body' }), 'Old title\nOld body')
 })
 
 function archiveFixture(target, { cardFails, sessionFails, lostReply, readFails, undoFails, initialSessionState = !target } = {}) {
