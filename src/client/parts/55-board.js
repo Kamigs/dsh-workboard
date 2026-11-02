@@ -703,8 +703,7 @@ function BoardPage(props) {
   async function handleArchiveTask(task) {
     setBusyTaskId(task.id)
     try {
-      if (typeof archiveTaskWithSession === 'function') await archiveTaskWithSession(task)
-      else await kanbanStore.archiveTask(task.id)
+      await setTaskArchivedWithSession(task, true)
       if (selectedTaskId === task.id) setSelectedTaskId(null)
       kanbanStore.toast(t('board.archived'), 'info')
     } catch (error) {

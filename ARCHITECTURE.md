@@ -269,7 +269,7 @@ and `.kbn-preview-*`; `59-data-transfer.js` → `.kbn-data-*`, `.kbn-import-*` a
   `90-entry.js` before any slot registers.
 - `60-session-bridge.js` declares hoisted functions the board calls from event
   handlers: `runTaskInNewSession(task)`, `openTaskSession(taskId)`,
-  `archiveTaskWithSession(task)`, `restoreTaskSession(task)`.
+  `setTaskArchivedWithSession(task, archived)`.
 - `37-account.js` declares the optional account read the editor and card use:
   `loadKbnAccount(ctx)`, `useKbnAccount()`, `kbnAccountMatchesTask()`.
 - `58-attachment-preview.js` declares `kbnAttachmentKind`,

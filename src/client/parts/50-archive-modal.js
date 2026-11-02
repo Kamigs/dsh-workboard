@@ -78,14 +78,7 @@ function ArchiveDialog({ open, onClose }) {
     setBusyId(task.id)
     setConfirmId(null)
     try {
-      const restored = await kanbanStore.restoreTask(task.id)
-      if (typeof restoreTaskSession === 'function') {
-        try {
-          await restoreTaskSession(restored !== null && restored !== undefined ? restored : task)
-        } catch (sessionError) {
-          kanbanStore.toast(t('toast.failed', { message: messageOf(sessionError) }), 'error')
-        }
-      }
+      await setTaskArchivedWithSession(task, false)
       kanbanStore.toast(t('archive.restored'), 'info')
     } catch (error) {
       kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')

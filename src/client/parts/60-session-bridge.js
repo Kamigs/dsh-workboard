@@ -32,6 +32,9 @@ addDict(
     'bridge.error.prompt': '未能确认任务已发送，请打开关联会话查看。{message}',
     'bridge.error.move': '任务已发送，请手动更新卡片状态。{message}',
     'bridge.error.archive': '归档会话失败：{message}',
+    'bridge.error.restore': '恢复会话失败：{message}',
+    'bridge.error.unconfirmed': '会话状态已更新，卡片状态暂时无法确认。请刷新看板后核对。{message}',
+    'bridge.error.rollback': '卡片更新失败，关联会话也未能回到原状态。请核对后重试。{message} / {rollback}',
     'bridge.bind.hint': '这个看板还没有工作目录，请选择一个目录再创建会话。',
     'bridge.bind.cancelled': '已取消选择工作目录',
     'bridge.bind.done': '已为看板「{title}」绑定工作目录',
@@ -58,6 +61,9 @@ addDict(
     'bridge.error.prompt': 'Could not confirm delivery. Open the linked session to check. {message}',
     'bridge.error.move': 'The brief was sent. Update the card status manually. {message}',
     'bridge.error.archive': 'Could not archive the session: {message}',
+    'bridge.error.restore': 'Could not restore the session: {message}',
+    'bridge.error.unconfirmed': 'Session updated. Refresh the board to check the card status. {message}',
+    'bridge.error.rollback': 'Card update failed and the session could not be returned to its previous state. Check both before retrying. {message} / {rollback}',
     'bridge.bind.hint': 'This board has no working directory yet — pick one to create its first session.',
     'bridge.bind.cancelled': 'Working-directory selection cancelled',
     'bridge.bind.done': 'Board "{title}" is now bound to its working directory',
@@ -248,32 +254,43 @@ async function openTaskSession(taskId) {
 }
 
 /**
- * Archive one Done task together with its execution session.
- * @param {object} task
- * @returns {Promise<object>} the archived task
+ * Apply the same archive state to the session and the card. If a card reply
+ * is lost, read back the durable state before deciding whether to undo.
  */
-async function archiveTaskWithSession(task) {
-  if (kanbanStore === null) return task
-  const ctx = kanbanStore.ctx
-  if (typeof task.sessionId === 'string' && task.sessionId !== '') {
-    try {
-      await ctx.uiWorkspace.archiveSession(task.sessionId, { stopActivity: true })
-    } catch (error) {
-      throw new Error(t('bridge.error.archive', { message: messageOf(error) }))
-    }
-  }
-  return kanbanStore.archiveTask(task.id)
-}
+async function setTaskArchivedWithSession(task, archived) {
+  const store = kanbanStore
+  const updateCard = archived ? store.archiveTask : store.restoreTask
+  const id = task.sessionId
+  if (typeof id !== 'string' || id === '') return updateCard(task.id)
 
-/**
- * Restore a task's execution session when the card is restored from the archive.
- * @param {object} task
- * @returns {Promise<void>}
- */
-async function restoreTaskSession(task) {
-  if (kanbanStore === null) return
-  if (typeof task.sessionId !== 'string' || task.sessionId === '') return
-  await kanbanStore.ctx.uiWorkspace.unarchiveSession(task.sessionId).catch(() => undefined)
+  const { uiWorkspace, workspaces } = store.ctx
+  const previouslyArchived = workspaces.list?.getSnapshot().archivedSessionIds?.includes(id)
+  try {
+    if (archived) await uiWorkspace.archiveSession(id, { stopActivity: true })
+    else await uiWorkspace.unarchiveSession(id)
+  } catch (error) {
+    throw new Error(t(archived ? 'bridge.error.archive' : 'bridge.error.restore', { message: messageOf(error) }))
+  }
+  try {
+    return await updateCard(task.id)
+  } catch (error) {
+    await store.refresh()
+    const snapshot = store.getSnapshot()
+    const confirmed = taskById(snapshot, task.id)
+    if (snapshot.status !== 'ready' || !confirmed || confirmed.sessionId !== id) {
+      throw new Error(t('bridge.error.unconfirmed', { message: messageOf(error) }))
+    }
+    if (confirmed.archived === archived) return confirmed
+    if (previouslyArchived !== archived) {
+      try {
+        if (archived) await uiWorkspace.unarchiveSession(id)
+        else await uiWorkspace.archiveSession(id, { stopActivity: false })
+      } catch (rollback) {
+        throw new Error(t('bridge.error.rollback', { message: messageOf(error), rollback: messageOf(rollback) }))
+      }
+    }
+    throw error
+  }
 }
 
 /**
