@@ -410,7 +410,7 @@ function SessionTaskMenu({ sessionId, tasks }) {
       kanbanStore.ctx.layout.selectPanel(PANEL_ID)
     },
     anchor: h(DshUI.Button, {
-      variant: 'toolbar', size: 'sm', title: label,
+      variant: open ? 'toolbar' : 'ghost', size: 'sm', title: label,
       'aria-label': label, 'aria-haspopup': 'menu', 'aria-expanded': open,
       onClick: toggle,
     }, h(DshUI.IconFlatListOutlineRegular, { size: 16 })),
