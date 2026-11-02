@@ -1028,6 +1028,20 @@ function BoardPage(props) {
               ? t('board.subtitle', { open: openCount, done: doneCount })
               : t('board.subtitleEmpty'))),
         h('div', { className: 'kbn-head-actions' },
+          h('div', { className: 'kbn-ws-select', title: activeBoard?.title },
+            h(Select, {
+              value: activeBoardId === null ? '' : activeBoardId,
+              onChange: (value) => {
+                const next = kbnFieldValue(value)
+                kbnLastWorkspaceId = next
+                setDataMenuOpen(false)
+                setSelectedTaskId(null)
+                setWorkspaceId(next)
+              },
+              options: boards.map((board) => ({ value: board.id, label: board.title })),
+              placeholder: t('board.selectBoard'),
+              ariaLabel: t('board.selectBoard'),
+            })),
           h('span', { className: 'kbn-badge-wrap' },
             h(IconButton, {
               icon: h(Icon, { name: 'archive' }),
@@ -1056,22 +1070,6 @@ function BoardPage(props) {
               onImport: handleImportPick,
             })),
           newBoardAction)),
-
-      h('div', { className: 'kbn-ws-bar' },
-        h('div', { className: 'kbn-ws-select' },
-          h(Select, {
-            value: activeBoardId === null ? '' : activeBoardId,
-            onChange: (value) => {
-              const next = kbnFieldValue(value)
-              kbnLastWorkspaceId = next
-              setDataMenuOpen(false)
-              setSelectedTaskId(null)
-              setWorkspaceId(next)
-            },
-            options: boards.map((board) => ({ value: board.id, label: board.title })),
-            placeholder: t('board.selectBoard'),
-            ariaLabel: t('board.selectBoard'),
-          }))),
 
       h('div', {
         className: 'kbn-workbench',

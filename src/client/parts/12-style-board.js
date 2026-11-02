@@ -68,16 +68,23 @@ addStyle(`
 .kbn-error-bar > svg { flex: none; }
 .kbn-error-bar > span { flex: 1; min-width: 0; }
 
-/* ---------------------------------------------------------------- workspace bar */
+/* -------------------------------------------------------- header board switcher */
 
-.kbn-ws-bar {
+.kbn-ws-select {
   display: flex;
-  justify-content: flex-end;
-  flex: none;
-  padding: 0 24px 14px;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
 }
 
-.kbn-ws-select { width: 220px; max-width: 42vw; flex: none; }
+.kbn-ws-select .kbn-input-wrap { width: auto; max-width: 220px; }
+.kbn-ws-select .kbn-select { field-sizing: content; width: auto; max-width: 100%; text-overflow: ellipsis; }
+.kbn-ws-select::after {
+  content: '';
+  height: 18px;
+  margin-inline-start: 10px;
+  border-inline-end: 1px solid var(--dsw-alias-border-l2);
+}
 
 /* Badge wrapper for the archive count. */
 .kbn-badge-wrap { position: relative; display: inline-flex; flex: none; }
