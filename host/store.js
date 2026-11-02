@@ -353,12 +353,17 @@ export async function writeJsonAtomic(file, value) {
   const text = JSON.stringify(value, null, 2) + '\n'
   const handle = await open(temporary, 'w')
   try {
-    await handle.writeFile(text, 'utf8')
-    await handle.sync()
-  } finally {
-    await handle.close()
+    try {
+      await handle.writeFile(text, 'utf8')
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
+    await rename(temporary, file)
+  } catch (error) {
+    await rm(temporary, { force: true })
+    throw error
   }
-  await rename(temporary, file)
 }
 
 /**
@@ -650,16 +655,23 @@ export class KanbanStore {
     return run
   }
 
-  /** @returns {Promise<void>} persists the task document */
-  async _persistTasks() {
-    await writeJsonAtomic(this.stateFile, { version: 1, boards: this.boards, tasks: this.tasks })
+  /** Apply one mutation to a detached draft inside the write queue. */
+  async _commitTasks(change) {
+    const draft = structuredClone({ version: 1, boards: this.boards, tasks: this.tasks })
+    const result = change(draft)
+    await writeJsonAtomic(this.stateFile, draft)
+    this.tasks = draft.tasks
+    this.boards = draft.boards
+    return result
   }
 
-  /** @returns {Promise<void>} persists the attachment sidecar */
-  async _persistAttachmentIndex() {
-    const document = {}
-    for (const [id, meta] of this.attachmentIndex.entries()) document[id] = meta
-    await writeJsonAtomic(this.attachmentIndexFile, document)
+  _changeTasks(change) {
+    return this._enqueue(() => this._commitTasks(change))
+  }
+
+  async _commitAttachmentIndex(index) {
+    await writeJsonAtomic(this.attachmentIndexFile, Object.fromEntries(index))
+    this.attachmentIndex = index
   }
 
   /**
@@ -702,7 +714,7 @@ export class KanbanStore {
    * @returns {Promise<object>}
    */
   async createBoard(title) {
-    return this._enqueue(async () => {
+    return this._changeTasks(({ boards }) => {
       const now = new Date().toISOString()
       const board = {
         id: this._nextBoardId(),
@@ -710,8 +722,7 @@ export class KanbanStore {
         createdAt: now,
         updatedAt: now,
       }
-      this.boards.push(board)
-      await this._persistTasks()
+      boards.push(board)
       return cloneTask(board)
     })
   }
@@ -724,25 +735,24 @@ export class KanbanStore {
    * @returns {Promise<{ boardId: string, workspaceId: string, migrated: number }>}
    */
   async bindBoard(boardId, workspaceId) {
-    return this._enqueue(async () => {
-      const board = typeof boardId === 'string' ? this.boards.find((entry) => entry.id === boardId) : undefined
+    return this._changeTasks(({ tasks, boards }) => {
+      const board = typeof boardId === 'string' ? boards.find((entry) => entry.id === boardId) : undefined
       if (board === undefined) throw kanbanError('kanban/board-not-found', `Board ${String(boardId)} not found.`)
       const target = normalizeWorkspaceId(workspaceId)
-      const migrated = this.tasks.filter((task) => task.workspaceId === board.id)
+      const migrated = tasks.filter((task) => task.workspaceId === board.id)
       for (const task of migrated) {
         task.workspaceId = target
         task.updatedAt = new Date().toISOString()
       }
       for (const status of STATUSES) {
-        const column = this.tasks
+        const column = tasks
           .filter((task) => task.workspaceId === target && task.status === status)
           .sort((left, right) => left.order - right.order || left.createdAt.localeCompare(right.createdAt))
         column.forEach((task, index) => {
           task.order = index
         })
       }
-      this.boards = this.boards.filter((entry) => entry.id !== board.id)
-      await this._persistTasks()
+      boards.splice(boards.indexOf(board), 1)
       return { boardId: board.id, workspaceId: target, migrated: migrated.length }
     })
   }
@@ -761,25 +771,27 @@ export class KanbanStore {
 
   /**
    * Find one task or fail with `kanban/task-not-found`.
+   * @param {object[]} tasks
    * @param {unknown} id
    * @returns {object}
    */
-  _requireTask(id) {
+  _requireTask(tasks, id) {
     if (typeof id !== 'string' || id === '') {
       throw kanbanError('kanban/task-not-found', 'Task not found.')
     }
-    const task = this.tasks.find((entry) => entry.id === id)
+    const task = tasks.find((entry) => entry.id === id)
     if (task === undefined) throw kanbanError('kanban/task-not-found', `Task ${id} not found.`)
     return task
   }
 
   /**
    * Re-number one column densely, preserving relative order.
+   * @param {object[]} tasks
    * @param {string} workspaceId
    * @param {string} status
    */
-  _densify(workspaceId, status) {
-    const column = this.tasks
+  _densify(tasks, workspaceId, status) {
+    const column = tasks
       .filter((task) => task.workspaceId === workspaceId && task.status === status)
       .sort((left, right) => left.order - right.order || left.createdAt.localeCompare(right.createdAt))
     column.forEach((task, index) => {
@@ -804,11 +816,11 @@ export class KanbanStore {
    * @returns {Promise<object>} the created task
    */
   async create(workspaceId, input) {
-    return this._enqueue(async () => {
+    return this._changeTasks(({ tasks }) => {
       const workspace = normalizeWorkspaceId(workspaceId)
       const fields = normalizeTaskInput(input)
       const now = new Date().toISOString()
-      const order = this.tasks.filter((task) => task.workspaceId === workspace && task.status === fields.status).length
+      const order = tasks.filter((task) => task.workspaceId === workspace && task.status === fields.status).length
       const task = {
         id: this._nextTaskId(),
         workspaceId: workspace,
@@ -828,8 +840,7 @@ export class KanbanStore {
         createdAt: now,
         updatedAt: now,
       }
-      this.tasks.push(task)
-      await this._persistTasks()
+      tasks.push(task)
       return cloneTask(task)
     })
   }
@@ -841,19 +852,18 @@ export class KanbanStore {
    * @returns {Promise<object>} the updated task
    */
   async update(id, patch) {
-    return this._enqueue(async () => {
-      const task = this._requireTask(id)
+    return this._changeTasks(({ tasks }) => {
+      const task = this._requireTask(tasks, id)
       const next = applyTaskPatch(task, patch)
       const previousStatus = task.status
       Object.assign(task, next)
       task.updatedAt = new Date().toISOString()
       if (task.status !== previousStatus) {
-        task.order = this.tasks.filter((entry) =>
+        task.order = tasks.filter((entry) =>
           entry.workspaceId === task.workspaceId && entry.status === task.status && entry.id !== task.id).length
-        this._densify(task.workspaceId, previousStatus)
-        this._densify(task.workspaceId, task.status)
+        this._densify(tasks, task.workspaceId, previousStatus)
+        this._densify(tasks, task.workspaceId, task.status)
       }
-      await this._persistTasks()
       return cloneTask(task)
     })
   }
@@ -866,12 +876,12 @@ export class KanbanStore {
    * @returns {Promise<object[]>} every task after the move
    */
   async move(id, status, beforeId) {
-    return this._enqueue(async () => {
-      const task = this._requireTask(id)
+    return this._changeTasks(({ tasks }) => {
+      const task = this._requireTask(tasks, id)
       const target = normalizeStatus(status)
       const previousStatus = task.status
-      this._densify(task.workspaceId, previousStatus)
-      const siblings = this.tasks
+      this._densify(tasks, task.workspaceId, previousStatus)
+      const siblings = tasks
         .filter((entry) => entry.workspaceId === task.workspaceId && entry.status === target && entry.id !== task.id)
         .sort((left, right) => left.order - right.order || left.createdAt.localeCompare(right.createdAt))
       let index = siblings.length
@@ -884,10 +894,9 @@ export class KanbanStore {
       siblings.forEach((entry, position) => {
         entry.order = position
       })
-      if (target !== previousStatus) this._densify(task.workspaceId, previousStatus)
+      if (target !== previousStatus) this._densify(tasks, task.workspaceId, previousStatus)
       task.updatedAt = new Date().toISOString()
-      await this._persistTasks()
-      return this.tasks.map(cloneTask)
+      return tasks.map(cloneTask)
     })
   }
 
@@ -897,14 +906,13 @@ export class KanbanStore {
    * @returns {Promise<object>}
    */
   async archive(id) {
-    return this._enqueue(async () => {
-      const task = this._requireTask(id)
+    return this._changeTasks(({ tasks }) => {
+      const task = this._requireTask(tasks, id)
       const now = new Date().toISOString()
       task.archived = true
       task.archivedAt = now
       task.updatedAt = now
-      this._densify(task.workspaceId, task.status)
-      await this._persistTasks()
+      this._densify(tasks, task.workspaceId, task.status)
       return cloneTask(task)
     })
   }
@@ -915,13 +923,12 @@ export class KanbanStore {
    * @returns {Promise<object>}
    */
   async restore(id) {
-    return this._enqueue(async () => {
-      const task = this._requireTask(id)
+    return this._changeTasks(({ tasks }) => {
+      const task = this._requireTask(tasks, id)
       task.archived = false
       task.archivedAt = null
       task.updatedAt = new Date().toISOString()
-      this._densify(task.workspaceId, task.status)
-      await this._persistTasks()
+      this._densify(tasks, task.workspaceId, task.status)
       return cloneTask(task)
     })
   }
@@ -933,25 +940,30 @@ export class KanbanStore {
    */
   async remove(id) {
     return this._enqueue(async () => {
-      const task = this._requireTask(id)
-      this.tasks = this.tasks.filter((entry) => entry.id !== task.id)
-      let indexChanged = false
-      for (const attachment of task.attachments) {
-        const meta = this.attachmentIndex.get(attachment.id)
-        if (meta !== undefined) {
-          for (const file of await this._attachmentCandidates(attachment.id, meta)) {
-            try {
-              await rm(file, { force: true })
-            } catch {
-              // Best effort: a missing file is already the desired state.
-            }
-          }
-        }
-        indexChanged = this.attachmentIndex.delete(attachment.id) || indexChanged
+      const removed = await this._commitTasks(({ tasks }) => {
+        const task = this._requireTask(tasks, id)
+        tasks.splice(tasks.indexOf(task), 1)
+        this._densify(tasks, task.workspaceId, task.status)
+        return task
+      })
+      const index = new Map(this.attachmentIndex)
+      const files = new Set()
+      for (const { id } of removed.attachments) {
+        if (this.tasks.some((task) => task.attachments.some((entry) => entry.id === id))) continue
+        const meta = index.get(id)
+        if (!meta) continue
+        index.delete(id)
+        for (const file of await this._attachmentCandidates(id, meta)) files.add(file)
       }
-      this._densify(task.workspaceId, task.status)
-      await this._persistTasks()
-      if (indexChanged) await this._persistAttachmentIndex()
+      if (index.size !== this.attachmentIndex.size) {
+        try {
+          await this._commitAttachmentIndex(index)
+          for (const file of files) await rm(file, { force: true })
+        } catch (error) {
+          // The deletion is durable. Keep its result even if orphan cleanup fails.
+          console.warn('[dsh-workboard] Attachment cleanup failed:', error)
+        }
+      }
       return true
     })
   }
@@ -963,11 +975,10 @@ export class KanbanStore {
    * @returns {Promise<object>}
    */
   async link(id, sessionId) {
-    return this._enqueue(async () => {
-      const task = this._requireTask(id)
+    return this._changeTasks(({ tasks }) => {
+      const task = this._requireTask(tasks, id)
       task.sessionId = normalizeSessionId(sessionId)
       task.updatedAt = new Date().toISOString()
-      await this._persistTasks()
       return cloneTask(task)
     })
   }
@@ -988,13 +999,18 @@ export class KanbanStore {
       const directory = workspaceDirectory === null ? this.attachmentsDir : workspaceDirectory
       await mkdir(directory, { recursive: true })
       const fileName = `${id}-${decoded.name}`
-      await writeFile(path.join(directory, fileName), decoded.bytes)
       const absolute = path.join(directory, fileName)
       const meta = workspaceDirectory === null
         ? { name: decoded.name, type: decoded.type, size: decoded.bytes.length, file: absolute }
         : { name: decoded.name, type: decoded.type, size: decoded.bytes.length, workspaceId, fileName, file: absolute }
-      this.attachmentIndex.set(id, meta)
-      await this._persistAttachmentIndex()
+      const index = new Map(this.attachmentIndex).set(id, meta)
+      await writeFile(absolute, decoded.bytes, { flag: 'wx' })
+      try {
+        await this._commitAttachmentIndex(index)
+      } catch (error) {
+        await rm(absolute, { force: true })
+        throw error
+      }
       return { id, name: meta.name, size: meta.size, type: meta.type }
     })
   }

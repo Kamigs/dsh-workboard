@@ -406,3 +406,50 @@ test('a corrupt state file is quarantined and the store starts empty', async () 
     await rm(dir, { recursive: true, force: true })
   }
 })
+
+test('failed state writes preserve boards, tasks, ordering and attachment bytes', async () => {
+  await withStore(async (store, dir) => {
+    const board = await store.createBoard('Unbound')
+    const file = await store.saveAttachment({ name: 'notes.txt', dataBase64: 'aGVsbG8=' })
+    const task = await store.create(board.id, { title: 'Keep', attachments: [file] })
+    await store.create(board.id, { title: 'Sibling' })
+    const before = await store.list()
+    const stateFile = store.stateFile
+    store.stateFile = store.attachmentsDir // Publishing over a directory always fails.
+    for (const change of [
+      () => store.create(board.id, { title: 'Rejected' }),
+      () => store.update(task.id, { title: 'Rejected edit', status: 'doing' }),
+      () => store.move(task.id, 'done'),
+      () => store.link(task.id, 'rejected-session'),
+      () => store.archive(task.id),
+      () => store.createBoard('Rejected board'),
+      () => store.bindBoard(board.id, 'ws-new'),
+      () => store.remove(task.id),
+    ]) {
+      await assert.rejects(change(), { code: 'EISDIR' })
+      assert.deepEqual(await store.list(), before)
+      assert.deepEqual(await store.listBoards(), [board])
+      assert.equal((await store.readAttachment(file.id)).bytes.toString(), 'hello')
+    }
+    store.stateFile = stateFile
+    const valid = await store.create(board.id, { title: 'Accepted' })
+    const reopened = createStore({ dataDir: dir })
+    try {
+      assert.deepEqual(await reopened.list(), [...before, valid])
+      assert.deepEqual(await reopened.listBoards(), [board])
+      assert.equal((await reopened.readAttachment(file.id)).bytes.toString(), 'hello')
+    } finally {
+      await reopened.close()
+    }
+  })
+})
+
+test('failed upload index write discards the unpublished file', async () => {
+  await withStore(async (store) => {
+    await store.ready()
+    store.attachmentIndexFile = store.attachmentsDir
+    await assert.rejects(store.saveAttachment({ name: 'x.txt', dataBase64: 'eA==' }), { code: 'EISDIR' })
+    assert.deepEqual(await readdir(store.attachmentsDir), [])
+    await rejectsWithCode(store.readAttachment('att_1'), 'kanban/attachment-not-found')
+  })
+})
