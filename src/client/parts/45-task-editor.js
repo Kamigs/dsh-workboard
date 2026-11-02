@@ -323,7 +323,6 @@ function TaskEditorDialog({ open, mode, task, workspaceId, onClose, onSaved }) {
           },
           placeholder: t('editor.titlePlaceholder'),
           maxLength: 120,
-          autoFocus: true,
           ariaLabel: t('editor.title'),
         })),
 

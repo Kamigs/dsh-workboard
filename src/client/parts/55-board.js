@@ -234,7 +234,6 @@ function NewBoardDialog({ open, onClose }) {
         onChange: (value) => setTitle(kbnFieldValue(value)),
         placeholder: t('board.namePlaceholder'),
         maxLength: 80,
-        autoFocus: true,
         ariaLabel: t('board.nameLabel'),
         onKeyDown: (event) => {
           if (event.key === 'Enter') {

@@ -711,9 +711,10 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   const railNone = render(test.AttachmentPreviewRail, { preview: null, onClose() {} })
   check(railNone === '', 'preview rail must render nothing without a target')
 
+  let selectedByKeyboard = 0
   const card = render(test.TaskCard, {
     task: tasks[0], workspace: workspaceA, selected: false, busy: false,
-    onEdit() {}, onRun() {}, onOpenSession() {}, onArchive() {}, onDelete() {},
+    onSelect() { selectedByKeyboard += 1 }, onEdit() {}, onRun() {}, onOpenSession() {}, onArchive() {}, onDelete() {},
   })
   check(card.includes('实现任务看板插件'), 'TaskCard did not render its title')
   check(card.includes('kbn-card'), 'TaskCard class missing')
@@ -722,6 +723,17 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(card.includes('kbn-card-side'), 'corner column (edit above urgency) missing')
   check(card.includes('data-has-send="true"'), 'AI card must pin the send button')
   check(card.includes('kbn-card-send'), 'AI card send button missing')
+  const article = renderedElements.find((node) => node.type === 'article')
+  const edit = renderedElements.find((node) => node.props.className === 'kbn-card-edit')
+  for (const key of ['Enter', ' ']) {
+    let prevented = false
+    const event = { key, target: edit, currentTarget: article, preventDefault() { prevented = true } }
+    article.props.onKeyDown(event)
+    check(!prevented && selectedByKeyboard === 0, 'card must leave nested button activation to the browser')
+    article.props.onKeyDown({ ...event, target: article })
+    check(prevented && selectedByKeyboard === 1, 'a focused card must still select on ' + key)
+    selectedByKeyboard = 0
+  }
   const humanCard = render(test.TaskCard, {
     task: Object.assign({}, tasks[1], { id: 'task_me', assignee: { kind: 'human', name: '' } }),
     workspace: workspaceA, selected: false, busy: false,

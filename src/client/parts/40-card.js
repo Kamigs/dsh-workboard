@@ -255,7 +255,7 @@ function TaskCard({
     'data-has-send': showSend ? 'true' : undefined,
     onClick: select,
     onKeyDown: (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return
+      if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
       event.preventDefault()
       select()
     },

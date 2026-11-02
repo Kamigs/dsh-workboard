@@ -286,12 +286,25 @@ function Chip({ tone = 'neutral', icon, onRemove, children }) {
   )
 }
 
-/** @param {HTMLElement} root @returns {HTMLElement | null} */
-function widgetFocusable(root) {
-  if (!root || typeof root.querySelector !== 'function') return null
-  return root.querySelector(
-    'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])',
-  )
+function widgetTabStops(root) {
+  if (!root) return []
+  const selector = 'button,input,select,textarea,a[href],audio[controls],video[controls],[tabindex]'
+  return Array.from(root.querySelectorAll(selector)).filter((element) =>
+    !element.matches(':disabled, [type="hidden"]') && element.tabIndex >= 0 &&
+    !element.closest('[inert]') && element.getClientRects().length > 0 &&
+    getComputedStyle(element).visibility === 'visible')
+}
+
+/** Let the browser tab between controls; wrap only at the dialog edges. */
+function containDialogTab(event, dialog) {
+  if (event.key !== 'Tab' || event.defaultPrevented || !dialog) return
+  const stops = widgetTabStops(dialog)
+  const active = document.activeElement
+  const boundary = event.shiftKey ? stops[0] : stops[stops.length - 1]
+  if (active !== boundary && active !== dialog && dialog.contains(active) && stops.length > 0) return
+  event.preventDefault()
+  const next = (event.shiftKey ? stops[stops.length - 1] : stops[0]) || dialog
+  next.focus()
 }
 
 /**
@@ -332,7 +345,7 @@ function Modal({
       if (!dialog) return
       // A native autoFocus inside the body already won; don't steal it.
       if (dialog.contains(document.activeElement) && document.activeElement !== dialog) return
-      const first = widgetFocusable(dialog.querySelector('.kbn-dialog-body')) || widgetFocusable(dialog)
+      const first = widgetTabStops(dialog.querySelector('.kbn-dialog-body'))[0] || widgetTabStops(dialog)[0]
       if (first) first.focus()
       else dialog.focus()
     }
@@ -351,6 +364,7 @@ function Modal({
   useEffect(() => {
     if (!open) return undefined
     const handleKeyDown = (event) => {
+      containDialogTab(event, dialogRef.current)
       if (event.key !== 'Escape' || busy) return
       event.stopPropagation()
       if (typeof onClose === 'function') onClose()

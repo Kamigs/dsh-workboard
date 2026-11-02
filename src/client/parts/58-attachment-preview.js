@@ -99,13 +99,22 @@ function AttachmentPreviewRail({ preview, onClose }) {
   useEffect(() => {
     if (attachment === null) return
     const rail = railRef.current
-    if (rail !== null && rail !== undefined && typeof rail.focus === 'function') rail.focus()
+    const trigger = document.activeElement
+    if (rail) rail.focus()
+    return () => {
+      if (trigger && trigger.isConnected) trigger.focus()
+    }
   }, [attachmentId])
 
   // Escape closes the preview instead of the dialog underneath.
   useEffect(() => {
     if (attachment === null) return undefined
     const onKeyDown = (event) => {
+      if (event.key === 'Tab') {
+        containDialogTab(event, railRef.current)
+        event.stopPropagation()
+        return
+      }
       if (event.key !== 'Escape') return
       event.preventDefault()
       event.stopPropagation()
