@@ -1,0 +1,76 @@
+{
+  "name": "dsh-workboard",
+  "version": "0.1.0",
+  "description": "Workspace-scoped task boards for DeepSeek Harness: To do / Doing / Done cards with dates, priority, tags, attachments, AI-task sessions and archival.",
+  "license": "MIT",
+  "author": "Kamigs",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "host",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "README.en.md",
+    "ARCHITECTURE.md",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "src",
+    "scripts"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "kanban",
+    "task-board",
+    "task-management",
+    "ai-agent",
+    "cordis"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kamigs/dsh-workboard.git"
+  },
+  "homepage": "https://github.com/Kamigs/dsh-workboard#readme",
+  "bugs": {
+    "url": "https://github.com/Kamigs/dsh-workboard/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "test": "node --test",
+    "test:smoke": "node scripts/smoke-host-routes.mjs && node scripts/smoke-client.mjs",
+    "verify": "node scripts/verify.mjs",
+    "check": "node scripts/build-client.mjs && node scripts/verify.mjs && node --test && node scripts/smoke-host-routes.mjs && node scripts/smoke-client.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

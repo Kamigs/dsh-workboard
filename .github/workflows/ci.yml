@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Build the browser bundle
+        run: node scripts/build-client.mjs
+
+      - name: The committed bundle matches the sources
+        run: git diff --exit-code lib/client.js
+
+      - name: Static checks (manifest, exports, locales, guards)
+        run: node scripts/verify.mjs
+
+      - name: Host store unit tests
+        run: node --test
+
+      - name: Host route smoke test
+        run: node scripts/smoke-host-routes.mjs
+
+      - name: Browser half render smoke test
+        run: node scripts/smoke-client.mjs

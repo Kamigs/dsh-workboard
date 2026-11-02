@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+
+# Test and coverage output
+coverage/
+.nyc_output/
+*.tap
+
+# Local data (never part of the plugin)
+.dsh/
+kanban-data/

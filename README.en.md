@@ -1,0 +1,166 @@
+# DSH Workboard · Task Board
+
+[![CI](https://github.com/Kamigs/dsh-workboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Kamigs/dsh-workboard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A DeepSeek Harness (DSH) plugin that adds a **Task Board** to the left sidebar.
+Every Harness workspace gets its own board with three permanently visible columns
+(To do / Doing / Done). Tasks carry dates, urgency, tags, attachments and an
+assignee (AI or the signed-in account). An AI task can spawn a Harness session
+that executes it; cards and sessions navigate to each other, and archiving a Done
+task archives its session too.
+
+[中文](README.md) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md)
+
+## Features
+
+- **Sidebar entry + central board panel** registered through the Harness slot
+  system, so icon, navigation and layout follow the host.
+- **Workspace-scoped boards**: switching workspace switches the board; create a
+  project from the board (pick a directory → DSH workspace).
+- **Three always-visible columns** — To do (grey) / Doing (blue) / Done (green).
+  An empty column shows an in-column placeholder instead of replacing the board;
+  cards drag across columns and reorder before/after other cards.
+- **Full task fields**: title, description, status, start date, due date,
+  urgency (low / medium / high / urgent), tags, attachments, assignee, session.
+- **Detail sheet** on the right (a deliberately different UI form from the
+  columns) with fields, description, tags, attachments and actions. Image
+  attachments show a large preview plus a thumbnail strip of every attachment;
+  video / audio / text / other files open in a right-hand preview rail.
+- **Run an AI task in a session**: a composer-style circular send button on the
+  card creates or reuses a session in the task's workspace, sends the task brief
+  as the first prompt, links the session back to the card and moves it to Doing.
+- **Bidirectional navigation**: the card opens its session, and the session
+  header shows a task chip that returns to the board with the card focused.
+- **Archive**: a Done task archives together with its session; the archive dialog
+  restores (and unarchives the session) or deletes entries.
+- **Import / export**: the "Data" button in the header exports every task as
+  JSON and imports a JSON document into the current project (new tasks only —
+  attachments, sessions and archived state are not migrated).
+- **Resizable splitter** between board and detail sheet; the chosen width is
+  remembered (localStorage, across reloads), double-click resets it, and the
+  maximum width adapts to the window so the three columns never collapse.
+- **DSH-matched UI**: host icon set (16px `currentColor` strokes), `--dsw-*`
+  design tokens, light/dark themes, zh/en copy.
+
+## Requirements
+
+- DeepSeek Harness `0.2.1-rc.5` (Desktop/Web profile) tested. Older/newer
+  versions that lack the `sidebar.panellist` / `main` slots or the
+  `connection.fetch` service simply leave the plugin inactive.
+- No build tooling is needed to run it; development needs Node.js >= 22.
+
+## Install
+
+The browser bundle `lib/client.js` is committed, so installation runs no build
+scripts.
+
+### From GitHub (recommended)
+
+```sh
+npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add github:Kamigs/dsh-workboard
+```
+
+Restart the profile afterwards; the board icon appears in the left sidebar.
+
+### From a local checkout (development)
+
+```sh
+git clone https://github.com/Kamigs/dsh-workboard.git
+cd dsh-workboard
+npm run build          # regenerate lib/client.js (optional)
+```
+
+Then install the absolute directory path from the Harness plugin manager:
+
+```
+plugin_manager action=install_bundle target=/absolute/path/to/dsh-workboard
+```
+
+A local directory is linked, so `npm run build` plus a page refresh is enough to
+pick up changes.
+
+### From npm (if published)
+
+```sh
+npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
+```
+
+## Usage
+
+1. Click the board icon in the left sidebar.
+2. Pick a workspace (or create a project with `+`, choosing a directory).
+3. Create a task (or use a column's `+`) and fill in its fields.
+4. Tasks assigned to **AI** show a blue circular send button at the card's
+   bottom right; it creates/reuses a session and sends the task brief.
+5. Click a card to read its details on the right; images preview inline, other
+   attachments open in the right preview rail.
+6. Archive a Done task from the card; the archive button in the header opens the
+   archive dialog for restoring or deleting entries.
+7. The header's "Data" button exports the board as JSON or imports a JSON export
+   into the current project.
+
+## Data and configuration
+
+- Task data: `$DSH_HOME/kanban/state.json` (`DSH_HOME` defaults to `~/.dsh`).
+- Attachments: stored in the owning workspace at `<workspace>/.dsh/assets/kanban/`
+  (file name `<attachmentId>-<original name>`); the plugin data directory keeps
+  `attachments/index.json` with name/type/size and the workspace reference.
+  Legacy files in the data directory are still readable. Attachments have **no
+  plugin-level size limit** (one JSON request body is bounded at 256 MiB and DSH
+  Connection applies its own `maxRequestBodyBytes`). Add `.dsh/` to the project's
+  `.gitignore` if you do not want attachment files in version control.
+- Writes serialize and publish atomically (temp file + `fsync` + `rename`); a
+  corrupt document is quarantined as `state.json.corrupt-<timestamp>` and the
+  board starts empty instead of failing.
+- Optional configuration, overriding the `kanban` row in the profile's
+  `cordis.patch.yml`:
+
+  ```yaml
+  - id: kanban
+    config:
+      dataDir: ~/Documents/kanban
+  ```
+
+- Everything stays on this machine; the HTTP surface is mounted under DSH
+  Connection's authenticated `/api` channel and only answers the signed-in
+  local browser.
+
+## Development
+
+```sh
+npm run build       # concat src/client/parts -> lib/client.js
+npm test            # host store unit tests (11)
+npm run test:smoke  # host routes end-to-end + browser-half render smoke (no browser)
+npm run check       # everything above plus static checks
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Layout
+
+```
+index.js                  host entry (injects connection / workspaceRegistry)
+host/store.js             task model, validation, atomic persistence, attachments
+host/routes.js            authenticated /api/kanban.* routes
+lib/client.js             generated browser bundle (committed)
+src/client/parts/*.js     browser sources, concatenated into one factory scope
+scripts/                  build, static verification, host-route and render smokes
+test/                     host store tests
+locale/                   plugin display metadata (en/zh)
+icon.svg, cordis.patch.yml
+```
+
+## Notes
+
+- The browser bundle only takes `react` from the Harness client module table; it
+  imports no `@deepseek-ai/*` runtime package. Icons are copied SVG paths from
+  the host icon set and every colour is a `--dsw-*` token, so host primitive
+  changes cannot break the plugin.
+- Account identity is read through the optional `remote.account.getProfile`.
+  Without a signed-in account the assignee falls back to plain "Human" and
+  everything else keeps working.
+
+## License
+
+[MIT](LICENSE)

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Task board">
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#0B1220"/>
+  <rect x="24" y="34" width="22" height="60" rx="7" fill="#3B82F6" opacity="0.28"/>
+  <rect x="53" y="34" width="22" height="44" rx="7" fill="#F59E0B" opacity="0.30"/>
+  <rect x="82" y="34" width="22" height="26" rx="7" fill="#22C55E" opacity="0.30"/>
+  <rect x="27" y="40" width="16" height="12" rx="4" fill="#93C5FD"/>
+  <rect x="27" y="57" width="16" height="12" rx="4" fill="#93C5FD"/>
+  <rect x="56" y="40" width="16" height="12" rx="4" fill="#FCD34D"/>
+  <rect x="56" y="57" width="16" height="12" rx="4" fill="#FCD34D"/>
+  <rect x="85" y="40" width="16" height="12" rx="4" fill="#86EFAC"/>
+</svg>
