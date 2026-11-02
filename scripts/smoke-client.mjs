@@ -348,6 +348,10 @@ if (definition === null) throw new Error('smoke: bundle did not register a Modul
 if (definition.id !== 'dsh-workboard') throw new Error('smoke: bundle id is ' + definition.id)
 
 const nativeUI = {
+  IconFlatListOutlineRegular: () => React.createElement('svg'),
+  Pill: ({ children }) => React.createElement('span', {}, children),
+  Menu: ({ anchor, open, items }) => React.createElement(React.Fragment, {}, anchor,
+    open && React.createElement('div', { role: 'menu' }, items.map((item) => item.label || item.text))),
   Button: ({ children, icon, ...props }) => React.createElement('button', props, icon, children),
   Modal: ({ open, title, children, footer }) => open
     ? React.createElement('section', { role: 'dialog' }, title, children, footer) : null,
@@ -525,8 +529,16 @@ check(afterAddClick.includes('kbn-project-dialog'), 'the header New board button
 
 // Session header link renders for a linked session and hides for an unrelated one.
 const linked = render(linkEntry.component, { sessionId: 'session-abc' })
+check(linked.includes('aria-label="关联任务"') && !linked.includes('实现任务看板插件'), 'task menu should start collapsed')
+const trigger = renderedElements.find((node) => node.props['aria-label'] === '关联任务')
+trigger.props.onClick()
+const menu = renderNode(React.createElement(linkEntry.component, { sessionId: 'session-abc' }))
+check(menu.includes('实现任务看板插件') && menu.includes('进行中') && !menu.includes('写归档弹窗'),
+  'expanded menu should show only the linked task and its board status')
+trigger.props.onClick()
+check(!renderNode(React.createElement(linkEntry.component, { sessionId: 'session-abc' })).includes('role="menu"'),
+  'second trigger click should collapse the task menu')
 const unrelated = render(linkEntry.component, { sessionId: 'session-other' })
-check(linked.includes('实现任务看板插件'), 'session header link did not render the linked task')
 check(unrelated === '', 'session header link rendered for an unrelated session')
 
 // Dialogs with the fake store injected through the same module scope.

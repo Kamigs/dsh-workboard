@@ -17,9 +17,7 @@ node scripts/smoke-client.mjs        # render every browser surface without a br
 
 ## Ground rules
 
-- The browser half must not import any `@deepseek-ai/*` package at runtime; only
-  `require('react')` is resolved by the bundle prelude. UI primitives are
-  re-implemented against `--dsw-*` tokens, icons are copied glyphs.
+- Use React and the host-provided `@deepseek-ai/dsh-client-ui-primitives` from the client module table. Use host controls and icons for session surfaces.
 - Browser parts are plain scripts concatenated inside one `factory(require)`
   scope: no `import`/`export`, no redeclaration of an earlier part's names.
 - Every CSS class is `kbn-` prefixed and every colour is a `--dsw-*` token.

@@ -713,10 +713,6 @@ function BoardPage(props) {
     }
   }
 
-  function handleOpenSession(task) {
-    if (task.sessionId) kanbanStore.ctx.uiWorkspace.openSession(task.sessionId)
-  }
-
   async function handleDeleteTask(task) {
     setBusyTaskId(task.id)
     try {
@@ -898,7 +894,7 @@ function BoardPage(props) {
           busy: busyTaskId === task.id,
           onEdit: openEdit,
           onRun: setSendTask,
-          onOpenSession: handleOpenSession,
+          onOpenSession: openTaskSession,
           onArchive: handleArchiveTask,
           onDelete: handleDeleteTask,
           onDragStart: () => handleCardDragStart(task),
@@ -1082,7 +1078,7 @@ function BoardPage(props) {
           onClose: () => setSelectedTaskId(null),
           onEdit: openEdit,
           onRun: setSendTask,
-          onOpenSession: handleOpenSession,
+          onOpenSession: openTaskSession,
           onArchive: handleArchiveTask,
           onDelete: handleDeleteTask,
           onPreview: (attachment) => setPreview({ task: selectedTask, attachment }),

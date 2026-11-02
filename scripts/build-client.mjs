@@ -1,7 +1,7 @@
 /**
  * Build the browser half: concatenate the ordered plugin parts into one
  * `window.__ModuleLoader__.load({ id, factory })` bundle. The Harness client
- * module table provides `react`; everything else in the bundle is self-contained.
+ * module table provides React and the DSH UI primitives.
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'

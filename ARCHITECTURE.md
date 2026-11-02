@@ -16,9 +16,7 @@ registry (`ctx.connection.fetch.register` on the host,
 
 ## 1. Hard rules
 
-1. **No runtime imports of Harness client packages.** Only `require('react')`
-   (already resolved by the bundle prelude). UI primitives are re-implemented
-   against `--dsw-*` tokens; icons are copied glyphs (see §6).
+1. Resolve React and the host-provided `@deepseek-ai/dsh-client-ui-primitives` through the client module table. The send dialog and session task menu use the native controls.
 2. Parts are plain scripts concatenated inside one `factory(require)` scope. No
    `import`/`export`; a part may use names declared by an earlier part and never
    redeclares one. `node scripts/build-client.mjs` validates the assembly.
@@ -147,7 +145,7 @@ interface KanbanStore {
 }
 ```
 
-Derived helpers: `tasksOf`, `archivedTasks`, `taskById`, `taskForSession`,
+Derived helpers: `tasksOf`, `archivedTasks`, `taskById`, `tasksForSession`,
 `workspaceOf`.
 
 ## 5. Widgets (`35-widgets.js`)
@@ -184,8 +182,7 @@ icon rotated 180°, so import/export read as one pair.
 
 ## 7. Visual language
 
-Values are sampled from the running Harness client (theme tokens and primitive
-CSS) and reproduced here, not imported.
+The board styles use Harness theme tokens. The send dialog and header menu render the host primitives directly.
 
 - Radius: `--dsw-radius-xs:4px`, `-sm:8px`, `-md:12px`, `-lg:16px`, `-xl:20px`,
   `-panel:28px`.
@@ -220,7 +217,7 @@ ctx.slots.inject('main', () => ctx.slots.register({
 
 ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
   name: 'conversation.session.header.utilities', id: 'kanban-task-link',
-  order: 20, locale: NS, inject: (sessionId) => ({ sessionId }),
+  order: -1, locale: NS, inject: (sessionId) => ({ sessionId }),
 }, TaskLinkAction))
 ```
 
@@ -268,7 +265,7 @@ and `.kbn-preview-*`; `59-data-transfer.js` → `.kbn-data-*`, `.kbn-import-*` a
 - `let kanbanStore = null` is declared in `25-store.js` and assigned by
   `90-entry.js` before any slot registers.
 - `60-session-bridge.js` declares hoisted functions the board calls from event
-  handlers: `runTaskInNewSession(task)`, `openTaskSession(taskId)`,
+  handlers: `dispatchTask(task, destination, mode)`, `openTaskSession(task)`,
   `setTaskArchivedWithSession(task, archived)`.
 - `37-account.js` declares the optional account read the editor and card use:
   `loadKbnAccount(ctx)`, `useKbnAccount()`, `kbnAccountMatchesTask()`.

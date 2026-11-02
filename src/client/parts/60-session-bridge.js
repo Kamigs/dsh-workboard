@@ -35,9 +35,7 @@ addDict(
     'send.unavailable': '会话已变更或不可用，请重新选择。',
     'send.relink': '发送后，任务将关联到所选会话。',
     'bridge.sessionTitle': '[任务] {title}',
-    'bridge.link.title': '该会话属于任务：{title}',
-    'bridge.link.label': '任务',
-    'bridge.link.open': '打开任务卡片',
+    'bridge.link.label': '关联任务',
     'bridge.error.noWorkspace': '找不到任务所在的工作区',
     'bridge.error.create': '创建会话失败：{message}',
     'bridge.error.link': '未能关联会话，任务尚未发送。{message}',
@@ -76,9 +74,7 @@ addDict(
     'send.unavailable': 'The session changed or is unavailable. Choose a destination again.',
     'send.relink': 'Sending will link the task to the selected session.',
     'bridge.sessionTitle': '[Task] {title}',
-    'bridge.link.title': 'This session belongs to the task: {title}',
-    'bridge.link.label': 'Task',
-    'bridge.link.open': 'Open task card',
+    'bridge.link.label': 'Linked tasks',
     'bridge.error.noWorkspace': 'The task workspace could not be found',
     'bridge.error.create': 'Could not create a session: {message}',
     'bridge.error.link': 'Could not link the session. The brief was not sent. {message}',
@@ -136,7 +132,7 @@ function buildTaskBrief(task, workspace, mode) {
 }
 
 /**
- * Send the task brief into one session as its first queued prompt.
+ * Queue the brief in the selected session, naming a newly created one.
  * @param {object} ctx - client context from the store
  * @param {string} sessionId
  * @param {string} text
@@ -326,6 +322,15 @@ addStyle(`
 .kbn-send-footer { display: flex; justify-content: flex-end; gap: 8px; }
 `)
 
+async function openTaskSession(task) {
+  if (!task.sessionId) return
+  try {
+    await kanbanStore.ctx.uiWorkspace.openSession(task.sessionId)
+  } catch (error) {
+    kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
+  }
+}
+
 /**
  * Apply the same archive state to the session and the card. If a card reply
  * is lost, read back the durable state before deciding whether to undo.
@@ -366,64 +371,43 @@ async function setTaskArchivedWithSession(task, archived) {
   }
 }
 
-/**
- * Session-header entry: visible only while the open session is linked to a task.
- * Clicking it selects the board panel and reveals the card.
- * @param {{ sessionId?: string, t?: Function }} props
- * @returns {object | null} React element or null
- */
-function TaskLinkAction({ sessionId, t: tr }) {
-  const translate = typeof tr === 'function' ? tr : t
-  const linked = kanbanStore.use(
-    (snapshot) => taskForSession(snapshot, sessionId),
-    (left, right) => (left === null || left === undefined)
-      ? (right === null || right === undefined)
-      : (right !== null && right !== undefined && left.id === right.id && left.title === right.title),
-  )
-  if (!linked) return null
-  const open = () => {
-    kanbanStore.setFocusTask(linked.id)
-    kanbanStore.ctx.layout.selectPanel(PANEL_ID)
-  }
-  return h(
-    'button',
-    {
-      type: 'button',
-      className: 'kbn-header-task',
-      title: translate('bridge.link.title', { title: linked.title }),
-      'aria-label': translate('bridge.link.open') + ': ' + linked.title,
-      onClick: open,
-    },
-    h(Icon, { name: 'board', size: 14 }),
-    h('span', { className: 'kbn-header-task-label' }, translate('bridge.link.label')),
-    h('span', { className: 'kbn-header-task-title' }, linked.title),
-  )
+function TaskLinkAction({ sessionId }) {
+  const linked = tasksForSession(kanbanStore.use(), sessionId)
+  if (!linked.length) return null
+  return h(SessionTaskMenu, { key: sessionId, tasks: linked })
 }
 
+function SessionTaskMenu({ tasks }) {
+  const [open, setOpen] = useState(false)
+  const label = t('bridge.link.label')
+  const items = [{ type: 'label', id: 'heading', text: label }, ...tasks.map((task) => ({
+    id: task.id,
+    label: h('span', { className: 'kbn-session-task-row' },
+      h('span', { className: 'kbn-session-task-name', title: task.title }, task.title),
+      h(DshUI.Pill, { className: 'kbn-session-task-status', 'data-status': task.status }, t('status.' + task.status))),
+  }))]
+  return h(DshUI.Menu, {
+    open, align: 'end', portal: true, autoFocus: true,
+    items, listClassName: 'kbn-session-tasks',
+    onClose: () => setOpen(false),
+    onSelect: (id) => {
+      setOpen(false)
+      kanbanStore.setFocusTask(id)
+      kanbanStore.ctx.layout.selectPanel(PANEL_ID)
+    },
+    anchor: h(DshUI.Button, {
+      variant: 'toolbar', size: 'sm', title: label,
+      'aria-label': label, 'aria-haspopup': 'menu', 'aria-expanded': open,
+      onClick: () => setOpen((value) => !value),
+    }, h(DshUI.IconFlatListOutlineRegular, { size: 16 })),
+  })
+}
 
 addStyle(`
-.kbn-header-task {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 220px;
-  height: 28px;
-  padding: 0 8px;
-  border: .5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-sm);
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  cursor: pointer;
-}
-.kbn-header-task:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
-.kbn-header-task:focus-visible {
-  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: -2px;
-}
-.kbn-header-task-label { color: var(--dsw-alias-label-tertiary); flex: none; }
-.kbn-header-task-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.kbn-session-tasks { width: min(288px, calc(100vw - 32px)); }
+.kbn-session-task-row { display: flex; align-items: center; gap: 12px; width: 100%; }
+.kbn-session-task-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.kbn-session-task-status { flex: none; }
+.kbn-session-task-status[data-status=doing] { color: var(--dsw-alias-state-business-primary); }
+.kbn-session-task-status[data-status=done] { color: var(--dsw-alias-state-success-primary); }
 `)

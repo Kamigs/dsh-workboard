@@ -1,7 +1,7 @@
 /**
  * Browser-half entry. Registers the plugin's copy, stylesheet, client store and
  * the three harness surfaces: the left-sidebar panel entry, the central board
- * panel, and the session-header link back to a linked task card.
+ * panel, and the session-header task status menu.
  */
 
 /**
@@ -75,7 +75,7 @@ function apply(ctx) {
   ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
     name: 'conversation.session.header.utilities',
     id: 'kanban-task-link',
-    order: 20,
+    order: -1,
     locale: NS,
     inject: (sessionId) => ({ sessionId }),
   }, TaskLinkAction))

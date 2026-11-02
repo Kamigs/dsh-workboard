@@ -27,11 +27,8 @@ task archives its session too.
   columns) with fields, description, tags, attachments and actions. Image
   attachments show a large preview plus a thumbnail strip of every attachment;
   video / audio / text / other files open in a right-hand preview rail.
-- **Run an AI task in a session**: a composer-style circular send button on the
-  card creates or reuses a session in the task's workspace, sends the task brief
-  as the first prompt, links the session back to the card and moves it to Doing.
-- **Bidirectional navigation**: the card opens its session, and the session
-  header shows a task chip that returns to the board with the card focused.
+- **Send an AI task**. Choose a new session, the linked session, or the eligible current session in the same workspace. Discussion keeps the card in its column. Executing a queued task moves it from To do to Doing. Users mark completion on the board.
+- **Linked tasks**. In a linked session, toggle the task list in the header to see board status. Select a task to reveal its card.
 - **Archive**: a Done task archives together with its session; the archive dialog
   restores (and unarchives the session) or deletes entries.
 - **Import / export**: the "Data" button in the header exports every task as
@@ -90,9 +87,9 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
 
 1. Click the board icon in the left sidebar.
 2. Pick a workspace (or create a project with `+`, choosing a directory).
-3. Create a task (or use a column's `+`) and fill in its fields.
+3. Create a task (or use a column's `+`) and enter its summary on the first line with details below.
 4. Tasks assigned to **AI** show a blue circular send button at the card's
-   bottom right; it creates/reuses a session and sends the task brief.
+   bottom right; choose the destination and send mode there.
 5. Click a card to read its details on the right; images preview inline, other
    attachments open in the right preview rail.
 6. Archive a Done task from the card; the archive button in the header opens the
@@ -153,10 +150,7 @@ icon.svg, cordis.patch.yml
 
 ## Notes
 
-- The browser bundle only takes `react` from the Harness client module table; it
-  imports no `@deepseek-ai/*` runtime package. Icons are copied SVG paths from
-  the host icon set and every colour is a `--dsw-*` token, so host primitive
-  changes cannot break the plugin.
+- The send dialog and session task menu use the Harness UI primitives and icons directly.
 - Account identity is read through the optional `remote.account.getProfile`.
   Without a signed-in account the assignee falls back to plain "Human" and
   everything else keeps working.

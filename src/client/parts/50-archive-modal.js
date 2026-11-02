@@ -100,20 +100,6 @@ function ArchiveDialog({ open, onClose }) {
     }
   }
 
-  function handleOpenSession(task) {
-    if (typeof openTaskSession !== 'function') return
-    try {
-      const result = openTaskSession(task.id)
-      if (result !== null && result !== undefined && typeof result.catch === 'function') {
-        result.catch((error) => {
-          kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
-        })
-      }
-    } catch (error) {
-      kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
-    }
-  }
-
   const groups = []
   const byWorkspace = new Map()
   archived.forEach((task) => {
@@ -166,7 +152,7 @@ function ArchiveDialog({ open, onClose }) {
                 variant: 'ghost',
                 icon: h(Icon, { name: 'link', size: 12 }),
                 disabled: rowBusy,
-                onClick: () => handleOpenSession(task),
+                onClick: () => openTaskSession(task),
               }, t('action.openSession')))
             }
             actions.push(h(Button, {

@@ -505,19 +505,9 @@ function taskById(snapshot, id) {
   return found === undefined ? null : found
 }
 
-/**
- * The active task linked to one harness session, if any.
- * @param {object} snapshot
- * @param {string} sessionId
- * @returns {object | null}
- */
-function taskForSession(snapshot, sessionId) {
-  if (snapshot === null || snapshot === undefined || !Array.isArray(snapshot.tasks)) return null
-  if (typeof sessionId !== 'string' || sessionId === '') return null
-  const linked = snapshot.tasks.find((task) => task !== null && task !== undefined
-    && task.sessionId === sessionId
-    && task.archived !== true)
-  return linked === undefined ? null : linked
+function tasksForSession(snapshot, sessionId) {
+  if (!sessionId) return []
+  return snapshot.tasks.filter((task) => !task.archived && task.sessionId === sessionId)
 }
 
 /**
