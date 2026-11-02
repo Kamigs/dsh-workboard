@@ -1213,12 +1213,13 @@ addStyle(`
 .kbn-card[data-has-send=true] .kbn-card-foot { padding-right: 42px; }
 `);
 
-// Keep every card taller than its corner stack, and reserve the right lane in
-// the footer so the badge / send circle never sit on footer content.
+// Leave vertical clearance below the priority badge for footer actions.
+// Only a separate send button needs horizontal space at the end of the footer.
 addStyle(`
 .kbn-card { min-height: 96px; }
+.kbn-card:has(.kbn-card-action) { min-height: 112px; }
 .kbn-card[data-has-send=true] { min-height: 128px; }
-.kbn-card-foot { padding-right: 70px; }
+.kbn-card-foot:has(.kbn-card-action) { flex-wrap: wrap; }
 .kbn-card[data-has-send=true] .kbn-card-foot { padding-right: 46px; }
 `);
 
