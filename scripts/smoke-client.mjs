@@ -26,6 +26,7 @@ let hooks = []
 let hookIndex = 0
 let instances = new Map()
 const effects = []
+const renderedElements = []
 
 function slot(initial) {
   if (hookIndex >= hooks.length) hooks.push({ value: initial })
@@ -97,6 +98,7 @@ function renderNode(node) {
     }
   }
   if (typeof node === 'object' && typeof node.type === 'string') {
+    renderedElements.push(node)
     const className = typeof node.props.className === 'string' ? node.props.className : ''
     const classAttr = className === '' ? '' : ` class="${className}"`
     const rawValue = node.props.value
@@ -142,6 +144,7 @@ function render(Component, props, passes = 3) {
   instances = new Map()
   let output = ''
   for (let pass = 0; pass < passes; pass++) {
+    renderedElements.length = 0
     hooks = []
     hookIndex = 0
     effects.length = 0
@@ -211,6 +214,7 @@ const standaloneBoard = {
   updatedAt: '2026-11-01T00:00:00.000Z',
 }
 let hostBoards = [standaloneBoard]
+let hostWorkspaces = [workspaceA, workspaceB]
 const tasks = [
   baseTask,
   Object.assign({}, baseTask, {
@@ -258,7 +262,7 @@ async function fakeFetch(url, init) {
     hostBoards = hostBoards.filter((board) => board.id !== payload.boardId)
     body = { ok: true, boardId: payload.boardId, workspaceId: payload.workspaceId, migrated: 1 }
   } else if (path.endsWith('/api/kanban.state')) {
-    body = { ok: true, workspaces: [workspaceA, workspaceB], boards: hostBoards, tasks: hostTasks }
+    body = { ok: true, workspaces: hostWorkspaces, boards: hostBoards, tasks: hostTasks }
   } else if (path.endsWith('/api/kanban.task.create')) {
     const task = taskFrom('task_new', Object.assign({ workspaceId: payload.workspaceId }, payload.input))
     hostTasks = hostTasks.concat([task])
@@ -501,6 +505,12 @@ check(!boardTwo.includes('data-task-id="task_3"'), 'server-archived task leaked 
 check(boardTwo.includes('kbn-card'), 'card class missing from board markup')
 check(boardTwo.includes('kbn-col'), 'column class missing from board markup')
 check(boardOne !== null, 'first board render returned nothing')
+
+const addBoard = renderedElements.find((node) => node.type === 'button' && node.props['aria-label'] === '新建看板')
+if (!addBoard) throw new Error('workspace switcher is missing its add button')
+addBoard.props.onClick()
+const afterAddClick = renderNode(React.createElement(mainEntry.component, {}))
+check(afterAddClick.includes('kbn-project-dialog'), 'the workspace add button must open the new-board form')
 
 // Session header link renders for a linked session and hides for an unrelated one.
 const linked = render(linkEntry.component, { sessionId: 'session-abc' })
@@ -751,6 +761,12 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(importResult.created === 1 && importResult.failed === 0, 'import executor did not create the task')
   check(store.getSnapshot().tasks.length === importedCount + 1, 'imported task is missing from the snapshot')
   check(fetchCalls.some((url) => url.includes('/api/kanban.task.create')), 'createTask did not call the host route')
+
+  hostBoards = []
+  hostWorkspaces = []
+  await store.refresh()
+  const orphanBoard = render(mainEntry.component, {})
+  check(orphanBoard.includes('还没有看板'), 'tasks left behind by removed workspaces must render the empty board state')
 }
 
 /* ------------------------------------------------------------------ report */

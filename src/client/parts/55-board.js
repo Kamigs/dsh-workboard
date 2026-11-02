@@ -966,7 +966,6 @@ function BoardPage(props) {
 
   const openCount = boardTasks.filter((task) => task.status !== 'done').length
   const doneCount = boardTasks.filter((task) => task.status === 'done').length
-  const hasData = boards.length > 0 || state.tasks.length > 0
   const inlineError = state.status === 'error' && typeof state.error === 'string' && state.error !== ''
     ? h('div', { className: 'kbn-error-bar', role: 'alert' },
       h(Icon, { name: 'warning', size: 14 }),
@@ -986,7 +985,7 @@ function BoardPage(props) {
   }, t('board.newBoard'))
 
   let region
-  if (!hasData) {
+  if (boards.length === 0) {
     if (state.status === 'error') {
       region = h('div', { className: 'kbn-board-region' },
         h('div', { className: 'kbn-board-placeholder' },
@@ -1015,15 +1014,6 @@ function BoardPage(props) {
             action: newBoardAction,
           })))
     }
-  } else if (boards.length === 0) {
-    region = h('div', { className: 'kbn-board-region' },
-      h('div', { className: 'kbn-board-placeholder' },
-        h(EmptyState, {
-          icon: h(Icon, { name: 'projectAdd', size: 22 }),
-          title: t('board.noWorkspaceTitle'),
-          description: t('board.noWorkspaceDesc'),
-          action: newProjectAction,
-        })))
   } else {
     region = h('div', { className: 'kbn-board-region' },
       inlineError,
@@ -1067,11 +1057,7 @@ function BoardPage(props) {
               onExport: handleExport,
               onImport: handleImportPick,
             })),
-          h(Button, {
-            variant: 'primary',
-            icon: h(Icon, { name: 'projectAdd', size: 14 }),
-            onClick: () => setBoardOpen(true),
-          }, t('board.newBoard')))),
+          newBoardAction)),
 
       h('div', { className: 'kbn-ws-bar' },
         h('div', { className: 'kbn-ws-select' },
@@ -1092,7 +1078,7 @@ function BoardPage(props) {
           h(IconButton, {
             icon: h(Icon, { name: 'projectAdd' }),
             label: t('board.newBoard'),
-            onClick: () => setProjectOpen(true),
+            onClick: () => setBoardOpen(true),
           }))),
 
       h('div', {
