@@ -1071,12 +1071,6 @@ function BoardPage(props) {
             options: boards.map((board) => ({ value: board.id, label: board.title })),
             placeholder: t('board.selectBoard'),
             ariaLabel: t('board.selectBoard'),
-          })),
-        h('span', { className: 'kbn-ws-actions' },
-          h(IconButton, {
-            icon: h(Icon, { name: 'projectAdd' }),
-            label: t('board.newBoard'),
-            onClick: () => setBoardOpen(true),
           }))),
 
       h('div', {

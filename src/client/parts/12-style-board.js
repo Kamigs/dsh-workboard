@@ -72,16 +72,12 @@ addStyle(`
 
 .kbn-ws-bar {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 10px;
+  justify-content: flex-end;
   flex: none;
   padding: 0 24px 14px;
 }
 
 .kbn-ws-select { width: 220px; max-width: 42vw; flex: none; }
-
-.kbn-ws-actions { display: inline-flex; align-items: center; gap: 6px; }
 
 /* Badge wrapper for the archive count. */
 .kbn-badge-wrap { position: relative; display: inline-flex; flex: none; }

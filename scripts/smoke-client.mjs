@@ -506,11 +506,12 @@ check(boardTwo.includes('kbn-card'), 'card class missing from board markup')
 check(boardTwo.includes('kbn-col'), 'column class missing from board markup')
 check(boardOne !== null, 'first board render returned nothing')
 
-const addBoard = renderedElements.find((node) => node.type === 'button' && node.props['aria-label'] === '新建看板')
-if (!addBoard) throw new Error('workspace switcher is missing its add button')
-addBoard.props.onClick()
+const addBoardButtons = renderedElements.filter((node) => node.type === 'button'
+  && (node.props['aria-label'] === '新建看板' || renderNode(node.props.children).includes('新建看板')))
+if (addBoardButtons.length !== 1) throw new Error('the populated board should have just one New board button')
+addBoardButtons[0].props.onClick()
 const afterAddClick = renderNode(React.createElement(mainEntry.component, {}))
-check(afterAddClick.includes('kbn-project-dialog'), 'the workspace add button must open the new-board form')
+check(afterAddClick.includes('kbn-project-dialog'), 'the header New board button must open the new-board form')
 
 // Session header link renders for a linked session and hides for an unrelated one.
 const linked = render(linkEntry.component, { sessionId: 'session-abc' })
