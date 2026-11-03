@@ -5,11 +5,11 @@ import vm from 'node:vm'
 
 const source = readFileSync(new URL('../src/client/parts/60-session-bridge.js', import.meta.url), 'utf8')
 
-function bridgeFixture({ fail, status = 'todo' } = {}) {
+function bridgeFixture({ fail, status = 'todo', linked = false } = {}) {
   const calls = []
   const toasts = []
   const prompts = []
-  const task = { id: 'task_1', workspaceId: 'ws', title: 'Test', status, sessionId: null }
+  const task = { id: 'task_1', workspaceId: 'ws', title: 'Test', status, sessionId: linked ? 'linked' : null }
   const workspace = { id: 'ws', bound: true, title: 'Test', path: '/project' }
   const record = (step) => {
     calls.push(step)
@@ -35,9 +35,12 @@ function bridgeFixture({ fail, status = 'todo' } = {}) {
       uiWorkspace: {
         openSession() { record('open') },
       },
-      workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws', sessionIds: ['current'] }], archivedSessionIds: [] }) } },
+      workspaces: { list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws', sessionIds: ['current', 'linked'] }], archivedSessionIds: [] }) } },
       sessions: {
-        list: { getSnapshot: () => ({ byId: { current: { retainedBy: { mainView: 1 }, displayTitle: 'My session' } } }) },
+        list: { getSnapshot: () => ({ byId: {
+          current: { retainedBy: { mainView: 1 }, displayTitle: 'My session' },
+          linked: { displayTitle: 'Linked session' },
+        } }) },
         async create() { record('connect'); return 's1' },
         retain: () => ({ ready: Promise.resolve(), binding: { session }, release: () => record('release') }),
       },
@@ -107,6 +110,26 @@ test('a destination outside the workspace cannot receive a prompt', async () => 
   const { run, calls } = bridgeFixture()
   await assert.rejects(run('other', 'execute'), /send.unavailable/)
   assert.deepEqual(calls, [])
+})
+
+test('all three destinations honor both send modes and keep completion manual', async () => {
+  for (const destination of ['new', 'current', 'linked']) {
+    for (const mode of ['discuss', 'execute']) {
+      for (const status of ['todo', 'doing']) {
+        const { run, task, calls, prompts } = bridgeFixture({ status, linked: destination === 'linked' })
+        const sessionId = destination === 'new' ? 's1' : destination
+        assert.equal(await run(destination, mode), sessionId)
+        assert.equal(task.sessionId, sessionId)
+        assert.equal(task.status, mode === 'execute' ? 'doing' : status)
+        assert.equal(prompts.length, 1)
+        assert.match(prompts[0].at(-1).text, new RegExp(mode === 'discuss' ? 'bridge.prompt.discuss' : 'bridge.prompt.request'))
+        assert.equal(calls.includes('rename'), destination === 'new')
+        assert.equal(calls.includes('connect'), destination === 'new')
+        assert.equal(calls.filter((call) => call === 'move').length, mode === 'execute' && status === 'todo' ? 1 : 0)
+        assert.equal(calls.at(-1), 'open')
+      }
+    }
+  }
 })
 
 test('a mixed attachment batch is sent in one prompt with a receipt scoped to its destination', async () => {
