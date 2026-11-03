@@ -26,6 +26,7 @@ const PARTS = [
   '58-attachment-preview.js',
   '59-data-transfer.js',
   '60-session-bridge.js',
+  '65-settings.js',
   '90-entry.js',
 ]
 

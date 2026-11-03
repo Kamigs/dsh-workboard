@@ -10,12 +10,8 @@
 addDict(
   {
     'data.trigger': '数据导入导出',
-    'data.menu': '数据',
     'data.export': '导出数据',
-    'data.exportHint': '下载 JSON：任务与字段，不含附件文件',
     'data.import': '导入数据',
-    'data.importHint': '从 JSON 导入到当前项目',
-    'data.note': '附件文件与归档状态不随导出迁移。',
     'data.exported': '已导出 {count} 个任务',
     'data.exportFailed': '导出失败：{message}',
     'data.importTitle': '导入数据',
@@ -37,12 +33,8 @@ addDict(
   },
   {
     'data.trigger': 'Import or export data',
-    'data.menu': 'Data',
     'data.export': 'Export data',
-    'data.exportHint': 'Download JSON: tasks and fields, without attachment files',
     'data.import': 'Import data',
-    'data.importHint': 'Import JSON into the current project',
-    'data.note': 'Attachment files and archived state are not migrated.',
     'data.exported': 'Exported {count} tasks',
     'data.exportFailed': 'Export failed: {message}',
     'data.importTitle': 'Import data',
@@ -231,158 +223,38 @@ async function kbnImportTasks(store, workspaceId, tasks, onProgress) {
 }
 
 /**
- * The header's data menu: export and import entry points.
- * @param {{ open: boolean, onClose: Function, onExport: Function, onImport: Function }} props
- * @returns {object | null} React element
- */
-function KbnDataMenu({ open, onClose, onExport, onImport }) {
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!open) return undefined
-    const onPointerDown = (event) => {
-      const root = ref.current
-      if (root === null || root === undefined) return
-      if (event.target !== null && root.contains(event.target)) return
-      onClose()
-    }
-    const onKeyDown = (event) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopPropagation()
-      onClose()
-    }
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('keydown', onKeyDown, true)
-    }
-  }, [open, onClose])
-
-  if (!open) return null
-  return h('div', { className: 'kbn-data-menu', role: 'menu', 'aria-label': t('data.menu'), ref },
-    h('button', {
-      type: 'button',
-      role: 'menuitem',
-      className: 'kbn-data-menu-item',
-      onClick: onExport,
-    },
-      h(Icon, { name: 'download', size: 14 }),
-      h('span', { className: 'kbn-data-menu-item-text' },
-        h('span', { className: 'kbn-data-menu-title' }, t('data.export')),
-        h('span', { className: 'kbn-data-menu-desc' }, t('data.exportHint')))),
-    h('button', {
-      type: 'button',
-      role: 'menuitem',
-      className: 'kbn-data-menu-item',
-      onClick: onImport,
-    },
-      h(Icon, { name: 'download', size: 14, className: 'kbn-icon-flip' }),
-      h('span', { className: 'kbn-data-menu-item-text' },
-        h('span', { className: 'kbn-data-menu-title' }, t('data.import')),
-        h('span', { className: 'kbn-data-menu-desc' }, t('data.importHint')))),
-    h('p', { className: 'kbn-data-menu-note' }, t('data.note')))
-}
-
-/**
  * Confirmation sheet shown between picking a file and importing it.
  * @param {{ state: object | null, onCancel: Function, onConfirm: Function }} props
  * @returns {object} React element
  */
-function KbnImportDialog({ state, onCancel, onConfirm }) {
-  const busy = state !== null && state.busy === true
-  const footer = state === null
-    ? null
-    : [
-      h(Button, { key: 'cancel', variant: 'ghost', size: 'sm', disabled: busy, onClick: onCancel },
-        t('data.importCancel')),
-      h(Button, { key: 'confirm', variant: 'primary', size: 'sm', disabled: busy, onClick: onConfirm },
-        t('data.importConfirm')),
-    ]
-  return h(Modal, {
-    open: state !== null,
-    onClose: busy ? () => undefined : onCancel,
-    title: t('data.importTitle'),
-    icon: h(Icon, { name: 'data', size: 16 }),
-    width: 480,
-    busy,
-    footer,
-  }, state === null
-    ? null
-    : h('div', { className: 'kbn-import' },
-      h('div', { className: 'kbn-import-row' },
-        h('span', { className: 'kbn-import-label' }, t('data.importFile')),
-        h('span', { className: 'kbn-import-value', title: state.fileName }, state.fileName)),
-      h('div', { className: 'kbn-import-row' },
-        h('span', { className: 'kbn-import-label' }, t('data.importTarget')),
-        h('span', { className: 'kbn-import-value' }, state.workspaceTitle)),
-      h('p', { className: 'kbn-import-count' }, t('data.importCount', { count: state.tasks.length })),
-      state.invalid > 0
-        ? h('p', { className: 'kbn-import-note' }, t('data.importInvalid', { count: state.invalid }))
-        : null,
-      h('p', { className: 'kbn-import-note' }, t('data.attachmentNote')),
-      busy && state.progress !== null && state.progress !== undefined
-        ? h('p', { className: 'kbn-import-progress', role: 'status' },
-          t('data.importing', { done: state.progress.done, total: state.progress.total }))
-        : null,
-      state.error !== null && state.error !== undefined
-        ? h('p', { className: 'kbn-import-error', role: 'alert' }, state.error)
-        : null))
+function KbnImportReview({ state, onCancel, onConfirm }) {
+  if (!state) return null
+  const busy = state.busy
+  return h('div', { className: 'kbn-import', role: 'group', 'aria-label': t('data.importTitle') },
+    h('div', { className: 'kbn-import-row' },
+      h('span', { className: 'kbn-import-label' }, t('data.importFile')),
+      h('span', { className: 'kbn-import-value', title: state.fileName }, state.fileName)),
+    h('div', { className: 'kbn-import-row' },
+      h('span', { className: 'kbn-import-label' }, t('data.importTarget')),
+      h('span', { className: 'kbn-import-value' }, state.workspaceTitle)),
+    h('p', { className: 'kbn-import-count' }, t('data.importCount', { count: state.tasks.length })),
+    state.invalid > 0
+      ? h('p', { className: 'kbn-import-note' }, t('data.importInvalid', { count: state.invalid }))
+      : null,
+    h('p', { className: 'kbn-import-note' }, t('data.attachmentNote')),
+    busy && state.progress !== null && state.progress !== undefined
+      ? h('p', { className: 'kbn-import-progress', role: 'status' },
+        t('data.importing', { done: state.progress.done, total: state.progress.total }))
+      : null,
+    state.error !== null && state.error !== undefined
+      ? h('p', { className: 'kbn-import-error', role: 'alert' }, state.error)
+      : null,
+    h('div', { className: 'kbn-settings-actions' },
+      h(DshUI.Button, { variant: 'outline', size: 'sm', disabled: busy, onClick: onCancel }, t('data.importCancel')),
+      h(DshUI.Button, { variant: 'primary', size: 'sm', disabled: busy, onClick: onConfirm }, t('data.importConfirm'))))
 }
 
 addStyle(`
-.kbn-data-anchor {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-}
-.kbn-data-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
-  width: 268px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border: .5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-lg);
-  background: var(--dsw-specific-menu);
-  backdrop-filter: var(--dsw-menu-backdrop-filter);
-  box-shadow: var(--dsw-elevation-prominent);
-}
-.kbn-data-menu-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: var(--dsw-radius-sm);
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-.kbn-data-menu-item:hover { background: var(--dsw-alias-interactive-bg-hover); }
-.kbn-data-menu-item:focus-visible {
-  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: -2px;
-}
-.kbn-data-menu-item > svg { flex: none; margin-top: 2px; color: var(--dsw-alias-label-tertiary); }
-.kbn-data-menu-item-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.kbn-data-menu-title { font-size: 13px; line-height: 20px; }
-.kbn-data-menu-desc { font-size: 11px; line-height: 16px; color: var(--dsw-alias-label-tertiary); }
-.kbn-data-menu-note {
-  margin: 4px 8px 2px;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-tertiary);
-}
-.kbn-icon-flip { transform: rotate(180deg); }
 .kbn-import { display: flex; flex-direction: column; gap: 8px; }
 .kbn-import-row { display: flex; gap: 8px; font-size: 13px; line-height: 20px; min-width: 0; }
 .kbn-import-label { flex: none; color: var(--dsw-alias-label-tertiary); }
@@ -391,7 +263,4 @@ addStyle(`
 .kbn-import-note { margin: 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
 .kbn-import-progress { margin: 2px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); font-variant-numeric: tabular-nums; }
 .kbn-import-error { margin: 2px 0 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-state-error-primary); }
-@media (prefers-reduced-motion: reduce) {
-  .kbn-data-menu-item { transition: none; }
-}
 `)

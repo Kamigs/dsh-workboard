@@ -343,7 +343,7 @@ const sandbox = {
 vm.createContext(sandbox)
 const instrumented = readFileSync(bundlePath, 'utf8').replace(
   '\nreturn {\n  inject:',
-  '  globalThis.__KANBAN_TEST__ = { TaskEditorDialog, ArchiveDialog, TaskCard, TaskDetailPanel, AttachmentPreviewRail, DateField, PriorityBadge, NewBoardDialog, KbnDataMenu, KbnImportDialog, kbnExportPayload, kbnParseImport, kbnImportTasks, kbnExportFileName, StatusDot, Modal, Button, allDicts: DICT, getStore: () => kanbanStore, loadAccount: () => loadKbnAccount(kanbanStore.ctx), currentDetailWidth: () => kbnDetailWidth, readDetailWidth: () => kbnReadDetailWidth(), storeDetailWidth: (width) => kbnStoreDetailWidth(width), boardsOf: (snapshot) => boardsOf(snapshot), boardOf: (snapshot, id) => boardOf(snapshot, id), ensureBoardWorkspace: (task) => ensureBoardWorkspace(task), createBoard: (title) => kanbanStore.createBoard(title) };\n  return {\n    inject:',
+  '  globalThis.__KANBAN_TEST__ = { TaskEditorDialog, ArchivedTaskList, TaskCard, TaskDetailPanel, AttachmentPreviewRail, DateField, PriorityBadge, NewBoardDialog, KbnImportReview, kbnExportPayload, kbnParseImport, kbnImportTasks, kbnExportFileName, StatusDot, Modal, Button, allDicts: DICT, getStore: () => kanbanStore, loadAccount: () => loadKbnAccount(kanbanStore.ctx), currentDetailWidth: () => kbnDetailWidth, readDetailWidth: () => kbnReadDetailWidth(), storeDetailWidth: (width) => kbnStoreDetailWidth(width), boardsOf: (snapshot) => boardsOf(snapshot), boardOf: (snapshot, id) => boardOf(snapshot, id), ensureBoardWorkspace: (task) => ensureBoardWorkspace(task), createBoard: (title) => kanbanStore.createBoard(title) };\n  return {\n    inject:',
 )
 check_instrumented: { if (!instrumented.includes('__KANBAN_TEST__')) console.error('smoke: could not instrument bundle') }
 vm.runInContext(instrumented, sandbox, { filename: 'lib/client.js' })
@@ -352,6 +352,7 @@ if (definition === null) throw new Error('smoke: bundle did not register a Modul
 if (definition.id !== 'dsh-workboard') throw new Error('smoke: bundle id is ' + definition.id)
 
 const nativeUI = {
+  IconSettingsOutlineMedium: () => React.createElement('svg'),
   IconFlatListOutlineRegular: () => React.createElement('svg'),
   Pill: ({ children }) => React.createElement('span', {}, children),
   Menu: ({ anchor, open, items, getAnchorRect }) => React.createElement(React.Fragment, {}, anchor,
@@ -569,7 +570,7 @@ check(boardTwo.includes('kbn-head'), 'board header missing')
 check(boardTwo.includes('kbn-workbench'), 'workbench layout missing')
 check(boardTwo.includes('Sprint board'), 'the standalone board is missing from the board switcher')
 check(boardTwo.includes('新建看板'), 'the header must offer creating a board')
-check(boardTwo.lastIndexOf('新建看板') > boardTwo.indexOf('kbn-data-anchor'), 'the create-board button must be the rightmost header action')
+check(boardTwo.lastIndexOf('新建看板') > boardTwo.indexOf('工作看板设置'), 'the create-board button must be the rightmost header action')
 check(boardTwo.includes('kbn-detail'), 'right-hand detail pane missing')
 check(boardTwo.includes('data-status="todo"') || boardTwo.includes('data-status=todo'), 'To do column missing')
 check(boardTwo.includes('data-status="doing"') || boardTwo.includes('data-status=doing'), 'Doing column missing')
@@ -609,8 +610,7 @@ if (test !== undefined) {
   check(boundWorkspace === 'ws-new', 'the first AI session must bind the board to a workspace')
   check(store.getSnapshot().boards.length === hostBoards.length, 'the bound board must leave the snapshot')
   check(store.getSnapshot().tasks.some((task) => task.id === 'task_unbound' && task.workspaceId === 'ws-new'), 'board tasks must migrate to the workspace')
-  check(boardTwo.includes('kbn-data-anchor'), 'the header data menu anchor is missing')
-check(boardTwo.includes('aria-haspopup="menu"'), 'the data trigger must advertise its menu')
+  check(boardTwo.includes('工作看板设置') && !boardTwo.includes('查看归档任务') && !boardTwo.includes('数据导入导出'), 'expected a single settings action in the header')
 check(test.currentDetailWidth() === 380, 'a remembered detail width must be restored')
   test.storeDetailWidth(420)
   check(test.readDetailWidth() === 420, 'the detail width must persist to localStorage')
@@ -716,7 +716,7 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
     store.uploadAttachment = upload
   }
 
-  const archive = render(test.ArchiveDialog, { open: true, onClose() {} })
+  const archive = render(test.ArchivedTaskList, { close() {} })
   check(archive.includes('归档任务'), 'archive dialog did not list the archived task')
   check(archive.includes('kbn-archive'), 'archive dialog class missing')
 
@@ -753,27 +753,33 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   })
   check(detailBlank.includes('kbn-detail-blank'), 'detail pane blank state missing')
 
-  const dataMenu = render(test.KbnDataMenu, { open: true, onClose() {}, onExport() {}, onImport() {} })
-  check(dataMenu.includes('导出数据'), 'data menu is missing the export item')
-  check(dataMenu.includes('导入数据'), 'data menu is missing the import item')
-  check(dataMenu.includes('role="menu"'), 'data menu must expose the menu role')
-  check(dataMenu.includes('role="menuitem"'), 'data menu items must expose the menuitem role')
-  const dataMenuClosed = render(test.KbnDataMenu, { open: false, onClose() {}, onExport() {}, onImport() {} })
-  check(dataMenuClosed === '', 'closed data menu must render nothing')
+  const settings = byId('dsh-workboard')
+  check(settings?.options.name === 'settings.section', 'Workboard must register in native Settings')
+  check(settings.options.label() === '工作看板' && panelEntry.options.label() === '工作看板', 'Workboard navigation labels differ')
+  const shellHandle = {}
+  let openedSection
+  ctx.slots.entriesOfSlot = (key) => key === 'sidebar.settings' ? [{ store: shellHandle }] : []
+  ctx.slots.resolveStore = (handle) => handle === shellHandle ? { actions: { openSection(id) { openedSection = id } } } : null
+  render(mainEntry.component, {})
+  const gear = renderedElements.find((node) => node.props['aria-label'] === '工作看板设置' && typeof node.props.onClick === 'function')
+  gear?.props.onClick()
+  check(openedSection === settings.options.id, 'header gear must open the registered native section')
+  const section = render(settings.component, { close() {} })
+  check(['看板名称', '归档任务', '导入数据', '导出数据'].every((label) => section.includes(label)), 'settings actions missing')
 
   const boardDialog = render(test.NewBoardDialog, { open: true, onClose() {} })
   check(boardDialog.includes('新建看板'), 'the new-board dialog is missing its title')
   check(boardDialog.includes('看板名称'), 'the new-board dialog is missing the name field')
   check(boardDialog.includes('工作目录会在第一次把 AI 任务发送到会话时再选择'), 'the new-board dialog must explain the deferred directory')
 
-  const importPreview = render(test.KbnImportDialog, {
+  const importPreview = render(test.KbnImportReview, {
     state: { fileName: 'board.json', tasks: [{ title: 'A' }, { title: 'B' }], invalid: 1, workspaceTitle: 'Alpha', busy: false, progress: null, error: null },
     onCancel() {}, onConfirm() {},
   })
   check(importPreview.includes('board.json'), 'import dialog must name the picked file')
   check(importPreview.includes('2 个任务可导入'), 'import dialog must count importable tasks')
   check(importPreview.includes('Alpha'), 'import dialog must name the target project')
-  const importBusy = render(test.KbnImportDialog, {
+  const importBusy = render(test.KbnImportReview, {
     state: { fileName: 'board.json', tasks: [{ title: 'A' }], invalid: 0, workspaceTitle: 'Alpha', busy: true, progress: { done: 1, total: 2 }, error: null },
     onCancel() {}, onConfirm() {},
   })
@@ -871,7 +877,7 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   await action('归档任务').props.onClick()
   const fromStore = () => store.getSnapshot().tasks.find((task) => task.id === 'task_new')
   check(fromStore()?.archived && fromStore().sessionId === 'session-xyz', 'detail archive must preserve the link')
-  render(test.ArchiveDialog, { open: true, onClose() {} })
+  render(test.ArchivedTaskList, { close() {} })
   const row = renderedElements.find((node) => node.props.className === 'kbn-archive-row'
     && renderNode(node.props.children).includes('新任务'))
   renderedElements.length = 0

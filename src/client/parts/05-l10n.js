@@ -4,7 +4,7 @@
  */
 addDict(
   {
-    'panel.title': '任务看板',
+    'panel.title': '工作看板',
     'status.todo': '待办',
     'status.doing': '进行中',
     'status.done': '已完成',
@@ -23,7 +23,7 @@ addDict(
     'toast.failed': '操作失败：{message}',
   },
   {
-    'panel.title': 'Task Board',
+    'panel.title': 'Workboard',
     'status.todo': 'To do',
     'status.doing': 'Doing',
     'status.done': 'Done',

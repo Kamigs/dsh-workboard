@@ -88,27 +88,6 @@ addStyle(`
   border-inline-end: 1px solid var(--dsw-alias-border-l2);
 }
 
-/* Badge wrapper for the archive count. */
-.kbn-badge-wrap { position: relative; display: inline-flex; flex: none; }
-
-.kbn-chip-count {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--dsw-alias-state-business-primary);
-  color: var(--dsw-alias-label-primary-foreground);
-  font-size: 10px;
-  line-height: 16px;
-  font-weight: 600;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
-}
-
 /* ----------------------------------------------------------------- columns */
 
 .kbn-col {

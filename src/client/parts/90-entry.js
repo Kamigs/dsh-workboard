@@ -1,7 +1,7 @@
 /**
  * Browser-half entry. Registers the plugin's copy, stylesheet, client store and
- * the three harness surfaces: the left-sidebar panel entry, the central board
- * panel, and the session-header task status menu.
+ * the harness surfaces: the left-sidebar panel entry, the central board
+ * panel, Workboard settings, and the session-header task status menu.
  */
 
 /**
@@ -71,6 +71,14 @@ function apply(ctx) {
     key: PANEL_ID,
     locale: NS,
   }, BoardPage))
+
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: PLUGIN_ID,
+    order: 100,
+    locale: NS,
+    label: () => t('panel.title'),
+  }, WorkboardSettings))
 
   ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
     name: 'conversation.session.header.utilities',

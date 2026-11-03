@@ -8,9 +8,7 @@ addDict(
     'board.subtitleEmpty': '选择或新建一个项目开始',
     'board.selectBoard': '选择看板',
     'board.newBoard': '新建看板',
-    'board.archive': '查看归档任务',
     'board.resizeDetail': '拖动调整任务详情宽度',
-    'board.archiveCount': '归档任务数量 {count}',
     'board.newTask': '新建任务',
     'board.addToColumn': '在「{status}」中新建任务',
     'board.emptyColumn': '暂无任务',
@@ -57,9 +55,7 @@ addDict(
     'board.subtitleEmpty': 'Choose or create a project to begin',
     'board.selectBoard': 'Select board',
     'board.newBoard': 'New board',
-    'board.archive': 'View archived tasks',
     'board.resizeDetail': 'Drag to resize the task details',
-    'board.archiveCount': '{count} archived tasks',
     'board.newTask': 'New task',
     'board.addToColumn': 'Add task to {status}',
     'board.emptyColumn': 'No tasks',
@@ -584,22 +580,18 @@ function BoardPage(props) {
   const [workspaceId, setWorkspaceId] = useState(kbnLastWorkspaceId)
   const [sendTask, setSendTask] = useState(null)
   const [editor, setEditor] = useState(null)
-  const [archiveOpen, setArchiveOpen] = useState(false)
   const [boardOpen, setBoardOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [drag, setDrag] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
   const [busyTaskId, setBusyTaskId] = useState(null)
   const [preview, setPreview] = useState(null)
-  const [dataMenuOpen, setDataMenuOpen] = useState(false)
-  const [importState, setImportState] = useState(null)
   const [detailWidth, setDetailWidth] = useState(kbnDetailWidth)
   const [workbenchWidth, setWorkbenchWidth] = useState(() => window.innerWidth)
   const [resizing, setResizing] = useState(false)
   const workbenchRef = useRef(null)
   const pendingMove = useRef(null)
   const resizeStartRef = useRef(null)
-  const importFileRef = useRef(null)
 
   const boards = boardsOf(state)
   const selectedBoard = boardOf(state, workspaceId)
@@ -608,7 +600,6 @@ function BoardPage(props) {
     : (boards.length > 0 ? boards[0] : null)
   const activeBoardId = activeBoard !== null ? activeBoard.id : null
   const boardTasks = activeBoardId !== null ? tasksOf(state, activeBoardId) : []
-  const archivedCount = archivedTasks(state).length
   const tasksByStatus = { todo: [], doing: [], done: [] }
   boardTasks.forEach((task) => {
     if (tasksByStatus[task.status] !== undefined) tasksByStatus[task.status].push(task)
@@ -803,94 +794,6 @@ function BoardPage(props) {
       kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
     } finally {
       setBusyTaskId(null)
-    }
-  }
-
-  function handleExport() {
-    setDataMenuOpen(false)
-    try {
-      const payload = kbnExportPayload(store.getSnapshot())
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = kbnExportFileName()
-      link.rel = 'noopener'
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-      store.toast(t('data.exported', { count: payload.tasks.length }), 'info')
-    } catch (error) {
-      store.toast(t('data.exportFailed', { message: messageOf(error) }), 'error')
-    }
-  }
-
-  function handleImportPick() {
-    setDataMenuOpen(false)
-    const input = importFileRef.current
-    if (input !== null && input !== undefined) input.click()
-  }
-
-  async function handleImportFile(event) {
-    const input = event !== null && event !== undefined ? event.target : null
-    const file = input !== null && input !== undefined
-      && input.files !== null && input.files !== undefined && input.files.length > 0
-      ? input.files[0]
-      : null
-    if (input !== null && input !== undefined) input.value = ''
-    if (file === null || file === undefined) return
-    if (activeBoard === null) {
-      store.toast(t('data.importNoWorkspace'), 'error')
-      return
-    }
-    let text
-    try {
-      text = await file.text()
-    } catch {
-      store.toast(t('data.readFailed'), 'error')
-      return
-    }
-    const parsed = kbnParseImport(text)
-    if (!parsed.ok) {
-      store.toast(t('data.parseFailed'), 'error')
-      return
-    }
-    if (parsed.tasks.length === 0) {
-      store.toast(t('data.importEmpty'), 'error')
-      return
-    }
-    setImportState({
-      fileName: file.name,
-      tasks: parsed.tasks,
-      invalid: parsed.invalid,
-      workspaceId: activeBoard.id,
-      workspaceTitle: activeBoard.title,
-      busy: false,
-      progress: null,
-      error: null,
-    })
-  }
-
-  async function confirmImport() {
-    if (importState === null || importState.busy === true) return
-    const target = importState
-    setImportState(Object.assign({}, target, { busy: true, error: null, progress: { done: 0, total: target.tasks.length } }))
-    try {
-      const result = await kbnImportTasks(store, target.workspaceId, target.tasks, (done, total) => {
-        setImportState((previous) => (previous === null
-          ? null
-          : Object.assign({}, previous, { progress: { done, total } })))
-      })
-      await store.refresh()
-      setImportState(null)
-      store.toast(result.failed > 0
-        ? t('data.importPartial', { created: result.created, failed: result.failed })
-        : t('data.importDone', { created: result.created }), result.failed > 0 ? 'error' : 'info')
-    } catch (error) {
-      setImportState((previous) => (previous === null
-        ? null
-        : Object.assign({}, previous, { busy: false, error: messageOf(error) })))
     }
   }
 
@@ -1089,7 +992,6 @@ function BoardPage(props) {
               onChange: (value) => {
                 const next = kbnFieldValue(value)
                 kbnLastWorkspaceId = next
-                setDataMenuOpen(false)
                 setSelectedTaskId(null)
                 setWorkspaceId(next)
               },
@@ -1097,33 +999,11 @@ function BoardPage(props) {
               placeholder: t('board.selectBoard'),
               ariaLabel: t('board.selectBoard'),
             })),
-          h('span', { className: 'kbn-badge-wrap' },
-            h(IconButton, {
-              icon: h(Icon, { name: 'archive' }),
-              label: t('board.archive'),
-              onClick: () => setArchiveOpen(true),
-            }),
-            archivedCount > 0
-              ? h('span', {
-                className: 'kbn-chip-count',
-                'aria-label': t('board.archiveCount', { count: archivedCount }),
-                title: t('board.archiveCount', { count: archivedCount }),
-              }, archivedCount > 99 ? '99+' : String(archivedCount))
-              : null),
-          h('span', { className: 'kbn-data-anchor' },
-            h(IconButton, {
-              icon: h(Icon, { name: 'data' }),
-              label: t('data.trigger'),
-              onClick: () => setDataMenuOpen((open) => !open),
-              ariaExpanded: dataMenuOpen,
-              ariaHasPopup: 'menu',
-            }),
-            h(KbnDataMenu, {
-              open: dataMenuOpen,
-              onClose: () => setDataMenuOpen(false),
-              onExport: handleExport,
-              onImport: handleImportPick,
-            })),
+          h(DshUI.Button, {
+            variant: 'ghost', size: 'sm',
+            title: t('settings.open'), 'aria-label': t('settings.open'), 'aria-haspopup': 'dialog',
+            onClick: () => openWorkboardSettings(store.ctx),
+          }, h(DshUI.IconSettingsOutlineMedium, { size: 16 })),
           newBoardAction)),
 
       h('div', {
@@ -1168,7 +1048,6 @@ function BoardPage(props) {
       h(AttachmentPreviewRail, { preview, onClose: () => setPreview(null) }),
 
     sendTask && h(TaskSendDialog, { key: sendTask.id, task: sendTask, onClose: () => setSendTask(null) }),
-    h(ArchiveDialog, { open: archiveOpen, onClose: () => setArchiveOpen(false) }),
     h(TaskEditorDialog, {
       open: editorOpen,
       mode: editor !== null ? editor.mode : 'create',
@@ -1176,20 +1055,6 @@ function BoardPage(props) {
       columnStatus: editor?.status,
       workspaceId: editor !== null && typeof editor.workspaceId === 'string' ? editor.workspaceId : activeBoardId,
       onClose: closeEditor,
-    }),
-    h('input', {
-      ref: importFileRef,
-      type: 'file',
-      accept: 'application/json,.json',
-      className: 'kbn-visually-hidden',
-      tabIndex: -1,
-      'aria-hidden': 'true',
-      onChange: handleImportFile,
-    }),
-    h(KbnImportDialog, {
-      state: importState,
-      onCancel: () => setImportState(null),
-      onConfirm: confirmImport,
     }),
     h(NewBoardDialog, {
       open: boardOpen,

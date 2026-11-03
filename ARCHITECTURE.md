@@ -6,9 +6,8 @@
   authenticated `/api/kanban.*` routes. Node built-ins only.
 - **Browser half** (`lib/client.js`, built from `src/client/parts/`) — a single
   `window.__ModuleLoader__.load({ id, factory })` bundle that registers the
-  left-sidebar panel entry, the central board panel, and a session-header task
-  link. It renders with React from the Harness platform module table and imports
-  no other `@deepseek-ai/*` package at runtime.
+  sidebar entry, board panel, native settings section and session-header task
+  link. It uses React and DSH UI primitives from the Harness module table.
 
 The two halves talk over the Connection service's authenticated exact-Fetch
 registry (`ctx.connection.fetch.register` on the host,
@@ -53,6 +52,7 @@ registry (`ctx.connection.fetch.register` on the host,
 | `src/client/parts/55-board.js` | `BoardPage`: workspace switch, three columns, drag & drop, detail sheet, resizer |
 | `src/client/parts/58-attachment-preview.js` | attachment classification, thumbnail data, right-hand preview rail |
 | `src/client/parts/60-session-bridge.js` | AI-task session creation, task ↔ session navigation |
+| `src/client/parts/65-settings.js` | Workboard settings, board names, archive and data transfer controls |
 | `src/client/parts/90-entry.js` | `apply()`: locale, styles, store, slot registrations |
 
 Build order is fixed in `scripts/build-client.mjs`; later parts may use
@@ -71,6 +71,7 @@ with `cache-control: no-store`; failures answer non-2xx with
 | POST | `/api/kanban.task.create` | `{ workspaceId, input }` | `{ ok, task }` |
 | POST | `/api/kanban.task.update` | `{ id, patch }` | `{ ok, task }` |
 | POST | `/api/kanban.task.move` | `{ id, status, beforeId? }` | `{ ok, tasks }` |
+| POST | `/api/kanban.board.rename` | `{ boardId, title }` | `{ ok, board: { id, title } }` |
 | POST | `/api/kanban.task.archive` | `{ id }` | `{ ok, task }` |
 | POST | `/api/kanban.task.restore` | `{ id }` | `{ ok, task }` |
 | POST | `/api/kanban.task.delete` | `{ id }` | `{ ok }` |
@@ -280,8 +281,9 @@ and `.kbn-preview-*`; `59-data-transfer.js` → `.kbn-data-*`, `.kbn-import-*` a
 
 ## 12. Data import / export
 
-The header's data button opens a menu with two actions; both live entirely in
-the browser half.
+The header gear opens the Workboard section in DSH’s `settings.section` slot.
+It provides board display names, archived tasks, import and export. Workspace
+board names are stored in the plugin’s `workspaceBoardTitles` map by workspace ID.
 
 Export (`kbnExportPayload` + a Blob download) writes one document:
 

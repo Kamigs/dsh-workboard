@@ -1,9 +1,9 @@
-# DSH Workboard · Task Board
+# DSH Workboard
 
 [![CI](https://github.com/Kamigs/dsh-workboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Kamigs/dsh-workboard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A DeepSeek Harness (DSH) plugin that adds a **Task Board** to the left sidebar.
+A DeepSeek Harness (DSH) plugin that adds a **Workboard** to the left sidebar.
 Every Harness workspace gets its own board with three permanently visible columns
 (To do / Doing / Done). Tasks carry dates, urgency, tags, attachments and an
 assignee (AI or the signed-in account). An AI task can spawn a Harness session
@@ -30,7 +30,7 @@ that executes it. Cards and sessions link to each other.
 - **Linked tasks**. In a linked session, toggle the task list in the header to see board status. Select a task to reveal its card.
 - **Archive** tasks in any column from their details. Restoring a task returns
   its card to the original column with its session link intact.
-- **Import / export**: the "Data" button in the header exports every task as
+- **Import / export**: the Workboard section in Settings exports every task as
   JSON and imports a JSON document into the current project (new tasks only —
   attachments, sessions and archived state are not migrated).
 - **Resizable splitter** between board and detail sheet; the chosen width is
@@ -85,13 +85,13 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
 ## Usage
 
 1. Click the board icon in the left sidebar.
-2. Pick a workspace (or create a project with `+`, choosing a directory).
+2. Switch boards in the header, or select **New board** to create a standalone board.
 3. Create a task (or use a column's `+`) and enter its summary on the first line with details below.
 4. Tasks assigned to **AI** show a blue circular send button at the card's
    bottom right; choose the destination and send mode there.
 5. Click a card to open its details. Select a new status to move it to that column.
-6. Choose **Archive task** in the details. Open the archive in the board header to restore or delete a task.
-7. The header's "Data" button exports the board as JSON or imports a JSON export
+6. Choose **Archive task** in the details. Open Workboard settings and expand Archived tasks to restore or delete a task.
+7. Use the header gear to rename a board, export all tasks as JSON or import a JSON export
    into the current project.
 
 ## Data and configuration

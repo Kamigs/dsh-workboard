@@ -54,25 +54,20 @@ function archiveDay(task) {
 
 /**
  * Archived-task manager.
- * @param {{ open: boolean, onClose: Function }} props
+ * @param {{ close: Function }} props
  * @returns {object} React element
  */
-function ArchiveDialog({ open, onClose }) {
+function ArchivedTaskList({ close }) {
   const state = kanbanStore.use((snapshot) => snapshot)
   const archived = archivedTasks(state)
   const [busyId, setBusyId] = useState(null)
   const [confirmId, setConfirmId] = useState(null)
 
   useEffect(() => {
-    if (!open) {
-      setConfirmId(null)
-      setBusyId(null)
-      return undefined
-    }
     if (confirmId === null) return undefined
     const timer = setTimeout(() => setConfirmId(null), 5000)
     return () => clearTimeout(timer)
-  }, [open, confirmId])
+  }, [confirmId])
 
   async function handleRestore(task) {
     setBusyId(task.id)
@@ -152,7 +147,7 @@ function ArchiveDialog({ open, onClose }) {
                 variant: 'ghost',
                 icon: h(Icon, { name: 'link', size: 12 }),
                 disabled: rowBusy,
-                onClick: () => openTaskSession(task),
+                onClick: () => { close(); openTaskSession(task) },
               }, t('action.openSession')))
             }
             actions.push(h(Button, {
@@ -202,12 +197,5 @@ function ArchiveDialog({ open, onClose }) {
       }))
   }
 
-  return h(Modal, {
-    open,
-    onClose,
-    title: t('archive.title'),
-    icon: h(Icon, { name: 'archive', size: 16 }),
-    width: 680,
-    footer: h(Button, { variant: 'ghost', onClick: onClose }, t('common.close')),
-  }, body)
+  return body
 }
