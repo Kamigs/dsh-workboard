@@ -268,11 +268,14 @@ function NewBoardDialog({ open, onClose }) {
     h('p', { className: 'kbn-detail-note' }, t('board.dirLaterHint'))))
 }
 
-function useMenuPlacement(open, heightLimit) {
+function useMenuPlacement(open, heightLimit, anchorSelector) {
   const [side, setSide] = useState('bottom')
   const trigger = useRef(null)
   const firstItem = useRef(null)
-  const getAnchorRect = useCallback(() => trigger.current?.getBoundingClientRect() ?? null, [])
+  const getAnchorRect = useCallback(() => {
+    const anchor = anchorSelector ? trigger.current?.closest(anchorSelector) : trigger.current
+    return anchor?.getBoundingClientRect() ?? null
+  }, [anchorSelector])
 
   React.useLayoutEffect(() => {
     if (!open) return
@@ -301,14 +304,14 @@ function useMenuPlacement(open, heightLimit) {
 function BoardSwitcher({ boards, board, onChange, disabled }) {
   const [expanded, setExpanded] = useState(false)
   const open = expanded && !disabled && boards.length > 0
-  const { trigger, firstItem, getAnchorRect, side } = useMenuPlacement(open, 360)
+  const { trigger, firstItem, getAnchorRect, side } = useMenuPlacement(open, 360, '.kbn-head-main')
   const label = t('board.selectBoard')
   return h(DshUI.Menu, {
     className: 'kbn-board-switcher', listClassName: 'kbn-board-options',
-    open, side, align: 'start', portal: true, autoFocus: true, getAnchorRect, minWidthFromAnchor: true,
+    open, side, align: 'start', portal: true, autoFocus: true, getAnchorRect,
     selectedId: board?.id,
     items: boards.map(({ id, title }, index) => ({
-      id, label: h('span', { ref: index === 0 ? firstItem : undefined, title }, title),
+      id, label: h('span', { ref: index === 0 ? firstItem : undefined, className: 'kbn-board-option-name', title }, title),
     })),
     onClose: () => setExpanded(false),
     onSelect: (id) => {
@@ -316,8 +319,8 @@ function BoardSwitcher({ boards, board, onChange, disabled }) {
       if (id !== board?.id) onChange(id)
     },
     anchor: h(DshUI.Button, {
-      ref: trigger, variant: 'outline', className: 'kbn-board-switcher-button',
-      disabled: disabled || !boards.length, title: board?.title || label,
+      ref: trigger, variant: 'ghost', className: 'kbn-board-switcher-button',
+      disabled: disabled || !boards.length, title: open ? undefined : label,
       'aria-label': board ? label + ' · ' + board.title : label, 'aria-haspopup': 'menu', 'aria-expanded': open,
       onClick: () => setExpanded((value) => !value),
       onKeyDown: (event) => {
@@ -327,7 +330,7 @@ function BoardSwitcher({ boards, board, onChange, disabled }) {
         }
       },
     }, h('span', { className: 'kbn-board-switcher-name' }, board?.title || label),
-    h(DshUI.IconChevronDownOutlineRegular, { size: 16, 'aria-hidden': true })),
+    h(DshUI.IconChevronDownOutlineRegular, { size: 16, className: 'kbn-board-switcher-arrow', 'aria-hidden': true })),
   })
 }
 

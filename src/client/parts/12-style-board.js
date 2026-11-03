@@ -74,9 +74,10 @@ addStyle(`
 
 .kbn-board-heading {
   align-self: flex-start;
-  max-width: min(100%, 32rem);
+  max-width: min(calc(100% + 8px), 32rem);
   min-width: 0;
   margin: 0;
+  margin-inline-start: -8px;
   font-size: 18px;
   line-height: 24px;
   font-weight: 600;
@@ -86,21 +87,28 @@ addStyle(`
 .kbn-board-switcher .kbn-board-switcher-button {
   width: 100%;
   min-width: 0;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  background: var(--dsw-alias-bg-module-platform);
+  justify-content: flex-start;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--dsw-alias-label-primary);
 }
-.kbn-board-heading .kbn-board-switcher-button { height: 36px; padding: 0 10px; font: inherit; }
-.kbn-board-switcher-button svg { flex: none; color: var(--dsw-alias-label-secondary); }
+.kbn-board-heading .kbn-board-switcher-button { height: 32px; padding: 0 8px; font: inherit; }
+.kbn-board-switcher .kbn-board-switcher-button[aria-expanded=true] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-state-business-primary); }
+@media (hover: hover) {
+  .kbn-board-switcher .kbn-board-switcher-button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-state-business-primary); }
+}
 .kbn-board-switcher-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbn-board-switcher-arrow { flex: none; color: var(--dsw-alias-label-secondary); }
 .kbn-board-switcher-button:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
 .kbn-board-options[role=menu] {
   background: var(--dsw-alias-bg-layer-1);
-  max-width: min(32rem, calc(100vw - 24px));
+  width: 260px;
+  max-width: calc(100vw - 24px);
   max-height: min(360px, calc(100vh - 24px));
 }
+.kbn-board-option-name { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ----------------------------------------------------------------- columns */
 
