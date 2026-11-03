@@ -34,6 +34,7 @@ addStyle(`
 }
 
 .kbn-board {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
@@ -243,6 +244,17 @@ addStyle(`
 /* -------------------------------------------------------------------- cards */
 
 .kbn-card-slot { display: block; min-width: 0; }
+
+.kbn-board > .kbn-card-flight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+  box-sizing: border-box;
+  offset-anchor: 0 0;
+  offset-rotate: 0deg;
+}
 
 .kbn-card {
   position: relative;
@@ -968,6 +980,14 @@ addStyle(`
 }
 .kbn-detail-workspace span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kbn-detail-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kbn-detail-status-picker { display: inline-flex; }
+.kbn-detail-status-picker .kbn-detail-status-trigger {
+  height: 24px;
+  padding: 0 9px;
+  gap: 5px;
+  border-radius: 999px;
+  font-size: 12px;
+}
 .kbn-detail-status {
   display: inline-flex;
   align-items: center;

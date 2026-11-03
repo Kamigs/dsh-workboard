@@ -90,8 +90,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
 3. Create a task (or use a column's `+`) and enter its summary on the first line with details below.
 4. Tasks assigned to **AI** show a blue circular send button at the card's
    bottom right; choose the destination and send mode there.
-5. Click a card to read its details on the right; images preview inline, other
-   attachments open in the right preview rail.
+5. Click a card to open its details. Select a new status to move it to that column.
 6. Choose **Archive task** in the details. Open the archive in the board header to restore or delete a task.
 7. The header's "Data" button exports the board as JSON or imports a JSON export
    into the current project.
