@@ -797,6 +797,7 @@ addStyle(`
 
 /* ------------------------------------------------------- project creation */
 
+.kbn-new-board-dialog { width: min(440px, calc(100vw - 32px)); }
 .kbn-project-dialog {
   display: flex;
   flex-direction: column;

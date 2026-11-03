@@ -94,17 +94,18 @@ function SettingsBoardRow({ board, selected, onSelect, disabled }) {
         ariaLabel: t('board.nameLabel'), maxLength: 80, disabled: busy, autoFocus: true,
       }) : h('button', { type: 'button', className: 'kbn-board-name', onClick: onSelect, disabled, title: board.title }, board.title),
       h(DshUI.Button, {
-        className: 'kbn-board-name-action', type: 'submit', variant: 'ghost', size: 'sm',
+        className: 'kbn-board-name-action kbn-board-icon-button', type: 'submit', variant: 'ghost', size: 'sm',
         disabled: busy || disabled || (editing && !title), loading: busy,
         'aria-label': (editing ? t('common.save') : t('settings.editName')) + ' · ' + board.title,
+        title: editing ? t('common.save') : t('settings.editName'),
       },
       h('span', { className: 'kbn-board-name-caption kbn-board-name-edit', 'aria-hidden': true },
-        h(DshUI.IconEditOutlineRegular, { size: 16 }), t('settings.editName')),
+        h(DshUI.IconEditOutlineRegular, { size: 16 })),
       h('span', { className: 'kbn-board-name-caption kbn-board-name-save', 'aria-hidden': true },
-        h(Icon, { name: 'check', size: 16 }), t('common.save'))),
+        h(Icon, { name: 'check', size: 16 }))),
       editing && h(DshUI.Button, {
-        type: 'button', variant: 'ghost', size: 'sm', disabled: busy,
-        'aria-label': t('common.cancel'), onClick: finishEditing,
+        className: 'kbn-board-icon-button', type: 'button', variant: 'ghost', size: 'sm', disabled: busy,
+        'aria-label': t('common.cancel'), title: t('common.cancel'), onClick: finishEditing,
         icon: h(Icon, { name: 'close', size: 16 }),
       })),
     error && h('p', { className: 'kbn-import-error', role: 'alert' }, error))
@@ -115,6 +116,7 @@ function WorkboardSettings({ close }) {
   const state = store.use((snapshot) => snapshot)
   const boards = boardsOf(state)
   const [boardId, setBoardId] = useState(kbnLastWorkspaceId)
+  const [boardOpen, setBoardOpen] = useState(false)
   const activeBoard = boards.find((board) => board.id === boardId) || boards[0] || null
   const [importState, setImportState] = useState(null)
   const importFileRef = useRef(null)
@@ -207,7 +209,12 @@ function WorkboardSettings({ close }) {
 
   return h('div', { className: 'kbn-settings' },
     h('section', { className: 'kbn-settings-group' },
-      h('h3', null, t('settings.target')),
+      h('div', { className: 'kbn-settings-heading' },
+        h('h3', null, t('settings.target')),
+        h(DshUI.Button, {
+          variant: 'ghost', size: 'sm', disabled: !!importState,
+          onClick: () => setBoardOpen(true),
+        }, h(Icon, { name: 'projectAdd', size: 16 }), t('board.newBoard'))),
       activeBoard ? h('ul', { className: 'kbn-settings-boards', 'aria-label': t('settings.target') },
         boards.map((board) => h(SettingsBoardRow, {
           key: board.id, board, selected: board.id === activeBoard.id,
@@ -237,6 +244,10 @@ function WorkboardSettings({ close }) {
     h('details', { className: 'kbn-settings-group' },
       h('summary', null, t('archive.title'), ' (', archivedTasks(state).length, ')'),
       h(ArchivedTaskList, { close })),
+    h(NewBoardDialog, { open: boardOpen, onClose: (board) => {
+      setBoardOpen(false)
+      if (board) setBoardId(board.id)
+    } }),
     state.toast && h('p', { role: 'status', className: 'kbn-detail-note' }, state.toast.message))
 }
 
@@ -247,17 +258,20 @@ addStyle(`
 .kbn-settings-group h3, .kbn-settings-group summary { margin: 0; font-size: 14px; font-weight: 600; }
 .kbn-settings-group summary { cursor: pointer; }
 .kbn-settings-group > .kbn-empty { min-height: 0; padding: 16px; }
+.kbn-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .kbn-settings-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .kbn-settings-actions .kbn-input-wrap { flex: 1; min-width: 100px; }
-.kbn-settings-boards { display: grid; gap: 8px; padding: 0; list-style: none; }
-.kbn-settings-board { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); }
+.kbn-settings-boards { display: grid; gap: 6px; margin-bottom: 0; padding: 0; list-style: none; }
+.kbn-settings-board { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: 6px 10px; padding: 4px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); }
 .kbn-settings-board[data-selected="true"] { background: var(--dsw-alias-interactive-bg-hover); }
 .kbn-settings-board > input { margin: 0; width: 16px; height: 16px; accent-color: var(--dsw-alias-label-primary); }
 .kbn-settings-board .kbn-import-error { grid-column: 2; margin: 0; }
 .kbn-board-name-form { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .kbn-board-name-form > .kbn-input-wrap { flex: 1; min-width: 0; }
-.kbn-board-name { flex: 1; min-width: 0; height: 36px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.kbn-board-name-action { display: grid !important; order: 1; flex-shrink: 0; min-width: 84px; }
+.kbn-board-name-form .kbn-input { height: 32px; font-size: 14px; font-weight: 400; }
+.kbn-board-name { flex: 1; min-width: 0; height: 32px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 400; line-height: 20px; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.kbn-settings-board .kbn-board-icon-button { flex-shrink: 0; width: 28px; height: 28px; min-width: 28px; padding: 0; }
+.kbn-board-name-action { display: grid !important; order: 1; }
 .kbn-board-name-caption { grid-area: 1 / 1; display: flex; align-items: center; justify-content: center; gap: 6px; pointer-events: none; transition: opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1); }
 .kbn-board-name-save { opacity: 0; transform: translateY(5px) scale(.96); }
 .kbn-settings-board[data-editing="true"] .kbn-board-name-edit { opacity: 0; transform: translateY(-5px) scale(.96); }

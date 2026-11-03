@@ -204,6 +204,7 @@ function NewBoardDialog({ open, onClose }) {
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const saving = useRef(false)
 
   useEffect(() => {
     if (!open) return
@@ -213,11 +214,13 @@ function NewBoardDialog({ open, onClose }) {
   }, [open])
 
   async function save() {
+    if (saving.current) return
     const name = title.trim()
     if (name === '') {
       setError(t('board.nameRequired'))
       return
     }
+    saving.current = true
     setBusy(true)
     setError(null)
     try {
@@ -227,6 +230,8 @@ function NewBoardDialog({ open, onClose }) {
     } catch (failure) {
       setError(messageOf(failure))
       setBusy(false)
+    } finally {
+      saving.current = false
     }
   }
 
@@ -235,13 +240,12 @@ function NewBoardDialog({ open, onClose }) {
     h(Button, { key: 'create', variant: 'primary', size: 'sm', disabled: busy, onClick: save }, t('board.createAction')),
   ]
 
-  return h(Modal, {
+  return h(DshUI.Modal, {
     open,
-    onClose: () => onClose(),
+    onClose: () => { if (!saving.current) onClose() },
     title: t('board.dialogTitle'),
-    icon: h(Icon, { name: 'projectAdd', size: 16 }),
-    width: 440,
-    busy,
+    closeLabel: t('common.close'),
+    className: 'kbn-new-board-dialog',
     footer,
   }, h('div', { className: 'kbn-project-dialog' },
     error !== null ? h('p', { className: 'kbn-editor-error', role: 'alert' }, error) : null,
@@ -251,9 +255,11 @@ function NewBoardDialog({ open, onClose }) {
         onChange: (value) => setTitle(kbnFieldValue(value)),
         placeholder: t('board.namePlaceholder'),
         maxLength: 80,
+        disabled: busy,
+        autoFocus: true,
         ariaLabel: t('board.nameLabel'),
         onKeyDown: (event) => {
-          if (event.key === 'Enter') {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
             event.preventDefault()
             save()
           }
