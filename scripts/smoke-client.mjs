@@ -580,6 +580,14 @@ check(boardTwo.includes('role="separator"'), 'resizer must expose the separator 
 check(boardTwo.includes('aria-orientation="vertical"'), 'resizer must be a vertical separator')
 check(boardTwo.includes('aria-valuemin="232"'), 'resizer minimum width is wrong')
 check(boardTwo.includes('aria-valuemax="560"'), 'resizer maximum width is wrong')
+const wideWindow = sandbox.window.innerWidth
+for (const [width, layout, detailWidth] of [[960, 'split', 250], [900, 'stacked', 232], [wideWindow, 'split', 380]]) {
+  sandbox.window.innerWidth = width
+  const board = render(mainEntry.component, {})
+  check(board.includes('data-layout="' + layout + '"'), 'incorrect board layout at ' + width)
+  check(board.includes('aria-valuenow="' + detailWidth + '"'), 'incorrect detail width at ' + width)
+}
+check(storage.get('dsh-kanban:detail-width') === '380', 'adapting the layout overwrote the preferred detail width')
 check(boardTwo.includes('<svg'), 'icons did not render')
 
 // Exposed bundle symbols (test-only instrumentation).

@@ -274,9 +274,9 @@ and `.kbn-preview-*`; `59-data-transfer.js` → `.kbn-data-*`, `.kbn-import-*` a
 - `90-entry.js` reads the collected dictionaries/styles, installs them, and is
   the only place that registers slots.
 - The detail-pane width is a browser preference kept in `localStorage` under
-  `dsh-kanban:detail-width` (retained for preference compatibility); it is clamped
-  to the adaptive range on mount and on window resize, and cleared by a
-  double-click on the splitter.
+  `dsh-kanban:detail-width` (retained for preference compatibility); the displayed width follows the space available inside
+  the DSH panel. Narrow panels place the selected task below the columns. Widening
+  the panel restores the preferred width. Double-clicking the splitter clears it.
 
 ## 12. Data import / export
 

@@ -16,7 +16,7 @@ addStyle(`
 
 .kbn-root *,.kbn-root *::before,.kbn-root *::after{box-sizing:border-box}
 
-.kbn-page{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:none}
+.kbn-page{--kbn-page-gutter:clamp(12px,2%,24px);display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:none}
 
 .kbn-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 24px 24px;scrollbar-width:thin;scrollbar-color:var(--dsw-alias-scrollbar-bg-l2) transparent}
 
@@ -30,7 +30,7 @@ addStyle(`
 
 /* ------------------------------------------------------------------ header */
 
-.kbn-head{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px 16px;flex:none;padding:18px 24px 10px}
+.kbn-head{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px 16px;flex:none;padding:18px var(--kbn-page-gutter) 10px}
 
 .kbn-head-main{display:flex;flex-direction:column;gap:2px;flex:1 1 140px;min-width:0}
 

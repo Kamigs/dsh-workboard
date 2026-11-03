@@ -144,22 +144,22 @@ let kbnDetailWidth = kbnReadDetailWidth()
 const KBN_DETAIL_MIN = 232
 /** Widest detail pane on any screen. */
 const KBN_DETAIL_MAX = 560
-/** Board pane floor: three 190px columns plus two 14px gaps. */
-const KBN_BOARD_MIN = 600
+/** Three readable columns and the two 14px gutters between them. */
+const KBN_BOARD_MIN = 3 * 216 + 2 * 14
 /** Resizer width plus the two flex gaps it replaces. */
 const KBN_RESIZER_SPACE = 34
 
 /**
- * Width limits for the detail pane at the current workbench size. The upper
- * bound adapts to the window so the three columns never collapse.
+ * Reserve room for the three columns after the sidebar and page gutters.
  * @param {number} workbenchWidth
- * @returns {{ min: number, max: number, fallback: number }}
+ * @returns {{ min: number, max: number, fallback: number, stacked: boolean }}
  */
 function kbnDetailLimits(workbenchWidth) {
   const width = Number.isFinite(workbenchWidth) && workbenchWidth > 0 ? workbenchWidth : 1200
-  const max = Math.max(KBN_DETAIL_MIN, Math.min(KBN_DETAIL_MAX, Math.round(width - KBN_RESIZER_SPACE - KBN_BOARD_MIN)))
-  const fallback = Math.min(max, Math.max(KBN_DETAIL_MIN, Math.round(width * 0.26)))
-  return { min: KBN_DETAIL_MIN, max, fallback }
+  const remaining = width - KBN_RESIZER_SPACE - KBN_BOARD_MIN
+  const max = Math.max(KBN_DETAIL_MIN, Math.min(KBN_DETAIL_MAX, Math.floor(remaining)))
+  const fallback = Math.min(max, 304, Math.max(248, Math.round(width * 0.26)))
+  return { min: KBN_DETAIL_MIN, max, fallback, stacked: remaining < KBN_DETAIL_MIN }
 }
 
 /**
@@ -533,11 +533,12 @@ function TaskDetailPanel({
 /** Reveal the destination in its column and carry the card across the column gutters. */
 function revealMovedCard(card, from) {
   const column = card.closest('.kbn-col-body')
-  const viewport = column.getBoundingClientRect()
+  const scroller = getComputedStyle(column).overflowY === 'visible' ? card.closest('.kbn-board-region') : column
+  const viewport = scroller.getBoundingClientRect()
   const bounds = card.getBoundingClientRect()
-  if (bounds.top < viewport.top) column.scrollTop += bounds.top - viewport.top
+  if (bounds.top < viewport.top) scroller.scrollTop += bounds.top - viewport.top
   else if (bounds.bottom > viewport.bottom) {
-    column.scrollTop += Math.min(bounds.top - viewport.top, bounds.bottom - viewport.bottom)
+    scroller.scrollTop += Math.min(bounds.top - viewport.top, bounds.bottom - viewport.bottom)
   }
   if (!from || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
@@ -593,6 +594,7 @@ function BoardPage(props) {
   const [dataMenuOpen, setDataMenuOpen] = useState(false)
   const [importState, setImportState] = useState(null)
   const [detailWidth, setDetailWidth] = useState(kbnDetailWidth)
+  const [workbenchWidth, setWorkbenchWidth] = useState(() => window.innerWidth)
   const [resizing, setResizing] = useState(false)
   const workbenchRef = useRef(null)
   const pendingMove = useRef(null)
@@ -623,24 +625,25 @@ function BoardPage(props) {
     if (card) return revealMovedCard(card, move.from)
   }, [selectedTask?.id, selectedTask?.status, activeBoardId])
 
-  /** Measured width of the workbench row (fallback for the first render). */
-  function workbenchWidth() {
+  // The DSH sidebar can change the panel width without resizing the window.
+  // Measure inside the page gutters. Only explicit splitter actions save a preference.
+  React.useLayoutEffect(() => {
     const element = workbenchRef.current
-    if (element !== null && element !== undefined && Number.isFinite(element.clientWidth) && element.clientWidth > 0) {
-      return element.clientWidth
+    if (!element) return
+    function measure() {
+      if (element.clientWidth > 0) setWorkbenchWidth(element.clientWidth)
     }
-    if (typeof window !== 'undefined' && Number.isFinite(window.innerWidth) && window.innerWidth > 0) return window.innerWidth
-    return 1200
-  }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
-  /** Current limits for the resize handle. */
-  function detailLimits() {
-    return kbnDetailLimits(workbenchWidth())
-  }
+  const limits = kbnDetailLimits(workbenchWidth)
+  const shownDetailWidth = detailWidth === null ? limits.fallback : kbnClampDetailWidth(detailWidth, limits)
 
   /** Store one width (clamped) and remember it across panel switches. */
   function applyDetailWidth(next) {
-    const limits = detailLimits()
     const width = next === null ? null : kbnClampDetailWidth(next, limits)
     kbnDetailWidth = width
     kbnStoreDetailWidth(width)
@@ -650,12 +653,7 @@ function BoardPage(props) {
   function startResize(event) {
     if (event.button !== undefined && event.button !== 0) return
     const element = event.currentTarget
-    const limits = detailLimits()
-    const detail = workbenchRef.current === null || workbenchRef.current === undefined
-      ? null
-      : workbenchRef.current.querySelector('.kbn-detail')
-    const measured = detail === null ? limits.fallback : Math.round(detail.getBoundingClientRect().width)
-    resizeStartRef.current = { x: event.clientX, width: kbnClampDetailWidth(measured, limits) }
+    resizeStartRef.current = { x: event.clientX, width: shownDetailWidth }
     if (element !== null && element !== undefined && typeof element.setPointerCapture === 'function') {
       try {
         element.setPointerCapture(event.pointerId)
@@ -688,43 +686,14 @@ function BoardPage(props) {
   }
 
   function keyResize(event) {
-    const limits = detailLimits()
     const step = event.shiftKey ? 48 : 16
-    if (event.key === 'ArrowLeft') applyDetailWidth((detailWidth === null ? limits.fallback : detailWidth) + step)
-    else if (event.key === 'ArrowRight') applyDetailWidth((detailWidth === null ? limits.fallback : detailWidth) - step)
+    if (event.key === 'ArrowLeft') applyDetailWidth(shownDetailWidth + step)
+    else if (event.key === 'ArrowRight') applyDetailWidth(shownDetailWidth - step)
     else if (event.key === 'Home') applyDetailWidth(limits.min)
     else if (event.key === 'End') applyDetailWidth(limits.max)
     else return
     event.preventDefault()
   }
-
-  // A remembered width may come from a wider window; clamp it on mount.
-  useEffect(() => {
-    if (kbnDetailWidth === null) return
-    const limits = kbnDetailLimits(workbenchWidth())
-    const clamped = kbnClampDetailWidth(kbnDetailWidth, limits)
-    if (clamped !== kbnDetailWidth) {
-      kbnDetailWidth = clamped
-      kbnStoreDetailWidth(clamped)
-      setDetailWidth(clamped)
-    }
-  }, [])
-
-  // Keep a dragged width inside the adaptive range when the window changes.
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined
-    const onResize = () => {
-      if (kbnDetailWidth === null) return
-      const limits = kbnDetailLimits(workbenchWidth())
-      const clamped = kbnClampDetailWidth(kbnDetailWidth, limits)
-      if (clamped !== kbnDetailWidth) {
-        kbnDetailWidth = clamped
-        setDetailWidth(clamped)
-      }
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
 
   // First mount: load the board unless something already did.
   useEffect(() => {
@@ -1161,7 +1130,8 @@ function BoardPage(props) {
         className: 'kbn-workbench',
         ref: workbenchRef,
         'data-resizing': resizing ? 'true' : undefined,
-        style: detailWidth === null ? undefined : { '--kbn-detail-width': detailWidth + 'px' },
+        'data-layout': limits.stacked ? 'stacked' : 'split',
+        style: { '--kbn-detail-width': shownDetailWidth + 'px' },
       },
         region,
         h('div', {
@@ -1169,9 +1139,9 @@ function BoardPage(props) {
           role: 'separator',
           'aria-orientation': 'vertical',
           'aria-label': t('board.resizeDetail'),
-          'aria-valuemin': detailLimits().min,
-          'aria-valuemax': detailLimits().max,
-          'aria-valuenow': detailWidth === null ? detailLimits().fallback : detailWidth,
+          'aria-valuemin': limits.min,
+          'aria-valuemax': limits.max,
+          'aria-valuenow': shownDetailWidth,
           'data-resizing': resizing ? 'true' : undefined,
           tabIndex: 0,
           title: t('board.resizeDetail'),

@@ -14,8 +14,9 @@ addStyle(`
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 24px 20px;
-  overflow: hidden;
+  min-width: 0;
+  container: kbn-lanes / inline-size;
+  overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--dsw-alias-scrollbar-bg-l2) transparent;
 }
@@ -38,7 +39,7 @@ addStyle(`
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
@@ -859,8 +860,7 @@ addStyle(`
   outline-offset: 2px;
 }
 
-@media (max-width: 900px) {
-  .kbn-board-region { overflow-y: auto; }
+@container kbn-lanes (max-width: 625px) {
   .kbn-board {
     flex: none;
     grid-template-columns: minmax(0, 1fr);
@@ -902,14 +902,13 @@ addStyle(`
   gap: 14px;
   flex: 1;
   min-height: 0;
-  padding: 0 24px 18px;
+  margin-inline: var(--kbn-page-gutter);
+  padding-bottom: 18px;
   box-sizing: border-box;
 }
-.kbn-workbench .kbn-board-region { padding: 0; }
-.kbn-workbench .kbn-board { grid-template-columns: repeat(3, minmax(200px, 1fr)); }
 
 .kbn-detail {
-  width: clamp(248px, 26vw, 304px);
+  width: var(--kbn-detail-width);
   flex: none;
   min-height: 0;
   display: flex;
@@ -1133,11 +1132,10 @@ addStyle(`
   outline-offset: 2px;
 }
 
-@media (max-width: 940px) {
-  .kbn-workbench { flex-direction: column; flex: none; }
-  .kbn-workbench .kbn-board-region { overflow: visible; }
-  .kbn-detail { width: 100%; max-height: 420px; }
-}
+.kbn-workbench[data-layout=stacked] { flex-direction: column; gap: 10px; }
+.kbn-workbench[data-layout=stacked] .kbn-detail { width: 100%; flex: 0 0 min(42%, 340px); }
+.kbn-workbench[data-layout=stacked] .kbn-detail-blank,
+.kbn-workbench[data-layout=stacked] .kbn-detail-resizer { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .kbn-card-send,
@@ -1248,6 +1246,25 @@ addStyle(`
 .kbn-card[data-has-send=true] .kbn-card-foot { padding-right: 46px; }
 `);
 
+// In a narrow card the edit button shares the title row. Put urgency on the
+// next line so neither the title nor the description reserves a 70px gutter.
+addStyle(`
+.kbn-card { container: kbn-card / inline-size; }
+@container kbn-card (max-width: 224px) {
+  .kbn-card-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 5px 6px;
+    padding-right: 0;
+  }
+  .kbn-card-side { display: contents; }
+  .kbn-card-side .kbn-priority { grid-column: 1 / -1; justify-self: start; }
+  .kbn-card-desc { padding-right: 0; }
+  .kbn-card-foot { flex-wrap: wrap; gap: 4px 6px; }
+}
+`);
+
 // Detail header: the edit affordance reuses the card's corner glyph so the two
 // surfaces share one style, and sits before the close button at the top-right.
 addStyle(`
@@ -1322,18 +1339,10 @@ addStyle(`
 
 // Resizable detail pane.
 //
-// A 6px grab strip sits between the board and the detail sheet. The width comes
-// from `--kbn-detail-width` (written by the drag handler); the fallback keeps the
-// responsive clamp, and the max bound is computed from the live workbench width
-// so the three columns never collapse below their floor.
+// A 6px grab strip adjusts the preferred width within the live board budget.
 addStyle(`
 .kbn-workbench { align-items: stretch; }
 .kbn-workbench[data-resizing=true] { user-select: none; }
-.kbn-workbench .kbn-board { grid-template-columns: repeat(3, minmax(190px, 1fr)); }
-.kbn-detail {
-  width: var(--kbn-detail-width, clamp(248px, 26vw, 304px));
-  transition: none;
-}
 .kbn-detail-resizer {
   flex: none;
   width: 6px;
@@ -1367,11 +1376,6 @@ addStyle(`
 .kbn-detail-resizer:focus-visible {
   box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);
   border-radius: var(--dsw-radius-sm);
-}
-
-@media (max-width: 940px) {
-  .kbn-detail-resizer { display: none; }
-  .kbn-detail { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
