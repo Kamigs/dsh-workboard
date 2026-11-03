@@ -134,7 +134,6 @@ function ArchivedTaskList({ close }) {
         const listId = 'kbn-archive-tasks-' + encodeURIComponent(group.id)
         return h('section', { className: 'kbn-archive-group', key: group.id },
           h('h4', { className: 'kbn-archive-group-title' },
-            h(Icon, { name: 'workspace', size: 14 }),
             h('span', null, workspaceTitle),
             h('span', { className: 'kbn-archive-count' }, '(', group.tasks.length, ')'),
             workspacePath !== '' ? h('span', { className: 'kbn-archive-ws', title: workspacePath }, workspacePath) : null),
