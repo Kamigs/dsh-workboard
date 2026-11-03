@@ -687,18 +687,6 @@ function BoardPage(props) {
     setEditor(null)
   }
 
-  function handleSaved(saved) {
-    // A column's ＋ button creates in that column even though the create API
-    // always starts in To do; the status field itself still wins when edited.
-    if (editor === null || editor.mode !== 'create') return
-    if (saved === null || saved === undefined) return
-    if (typeof editor.status !== 'string' || editor.status === 'todo') return
-    if (saved.status !== 'todo') return
-    kanbanStore.moveTask(saved.id, editor.status).catch((error) => {
-      kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
-    })
-  }
-
   async function handleArchiveTask(task) {
     setBusyTaskId(task.id)
     try {
@@ -1090,9 +1078,9 @@ function BoardPage(props) {
       open: editorOpen,
       mode: editor !== null ? editor.mode : 'create',
       task: editorTask,
+      columnStatus: editor?.status,
       workspaceId: editor !== null && typeof editor.workspaceId === 'string' ? editor.workspaceId : activeBoardId,
       onClose: closeEditor,
-      onSaved: handleSaved,
     }),
     h('input', {
       ref: importFileRef,

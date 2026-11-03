@@ -1,5 +1,5 @@
 /**
- * Task editor dialog: create and edit every task field, upload attachments,
+ * Task editor dialog: create and edit task details, upload attachments,
  * manage tags, pick the assignee kind, validate inline and surface host errors.
  */
 addDict(
@@ -8,7 +8,6 @@ addDict(
     'editor.editTitle': '编辑任务',
     'editor.content': '任务内容',
     'editor.contentPlaceholder': '第一行概括任务，后面可补充背景和验收标准。',
-    'editor.status': '状态',
     'editor.startDate': '开始日期',
     'editor.dueDate': '截止日期',
     'editor.priority': '紧急程度',
@@ -36,7 +35,6 @@ addDict(
     'editor.editTitle': 'Edit task',
     'editor.content': 'Task content',
     'editor.contentPlaceholder': 'Summarize the task on the first line. Add details below.',
-    'editor.status': 'Status',
     'editor.startDate': 'Start date',
     'editor.dueDate': 'Due date',
     'editor.priority': 'Priority',
@@ -111,13 +109,12 @@ function taskContentText({ title, description }) {
 
 /**
  * Create/edit task dialog.
- * @param {{ open: boolean, mode: 'create' | 'edit', task?: object | null, workspaceId?: string | null, onClose: Function, onSaved?: Function }} props
+ * @param {{ open: boolean, mode: 'create' | 'edit', task?: object | null, workspaceId?: string | null, columnStatus?: string, onClose: Function, onSaved?: Function }} props
  * @returns {object} React element
  */
-function TaskEditorDialog({ open, mode, task, workspaceId, onClose, onSaved }) {
+function TaskEditorDialog({ open, mode, task, workspaceId, columnStatus, onClose, onSaved }) {
   const isEdit = mode === 'edit' && task !== null && task !== undefined
   const [content, setContent] = useState('')
-  const [status, setStatus] = useState('todo')
   const [startDate, setStartDate] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -149,7 +146,6 @@ function TaskEditorDialog({ open, mode, task, workspaceId, onClose, onSaved }) {
     if (!open) return
     const source = task !== null && task !== undefined ? task : null
     setContent(source ? taskContentText(source) : '')
-    setStatus(source !== null && STATUSES.indexOf(source.status) >= 0 ? source.status : 'todo')
     setStartDate(source !== null && typeof source.startDate === 'string' ? source.startDate : '')
     setDueDate(source !== null && typeof source.dueDate === 'string' ? source.dueDate : '')
     setPriority(source !== null && PRIORITIES.indexOf(source.priority) >= 0 ? source.priority : 'medium')
@@ -269,7 +265,6 @@ function TaskEditorDialog({ open, mode, task, workspaceId, onClose, onSaved }) {
     }
     const payload = {
       ...(isEdit && content === taskContentText(task) ? {} : taskContentFields(content)),
-      status,
       startDate: startDate === '' ? null : startDate,
       dueDate: dueDate === '' ? null : dueDate,
       priority,
@@ -289,7 +284,7 @@ function TaskEditorDialog({ open, mode, task, workspaceId, onClose, onSaved }) {
     try {
       const saved = isEdit
         ? await kanbanStore.updateTask(task.id, payload)
-        : await kanbanStore.createTask(workspaceId, payload)
+        : await kanbanStore.createTask(workspaceId, { ...payload, status: columnStatus })
       kanbanStore.toast(t('editor.saved'), 'info')
       if (typeof onSaved === 'function') onSaved(saved)
       if (typeof onClose === 'function') onClose()
@@ -319,7 +314,6 @@ function TaskEditorDialog({ open, mode, task, workspaceId, onClose, onSaved }) {
     }
   }
 
-  const statusOptions = STATUSES.map((value) => ({ value, label: t('status.' + value) }))
   const priorityOptions = PRIORITIES.map((value) => ({ value, label: t('priority.' + value) }))
 
   const footer = h(Fragment, null,
@@ -373,15 +367,7 @@ function TaskEditorDialog({ open, mode, task, workspaceId, onClose, onSaved }) {
         })),
 
       h('div', { className: 'kbn-form-grid' },
-        h('div', { className: 'kbn-form-row' },
-          h(Field, { label: t('editor.status') },
-            h(Select, {
-              value: status,
-              onChange: (value) => setStatus(kbnFieldValue(value)),
-              options: statusOptions,
-              ariaLabel: t('editor.status'),
-            }))),
-        h('div', { className: 'kbn-form-row' },
+        h('div', { className: 'kbn-form-row', 'data-span': 'full' },
           h(Field, { label: t('editor.priority') },
             h(Select, {
               value: priority,

@@ -616,6 +616,8 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   const editorEdit = render(test.TaskEditorDialog, {
     open: true, mode: 'edit', task: tasks[0], workspaceId: 'ws-a', onClose() {}, onSaved() {},
   })
+  check([editorCreate, editorEdit].every((dialog) => !dialog.includes('aria-label="状态"')),
+    'the task column must be the only status control in the editor workflow')
   check(editorEdit.includes('实现任务看板插件'), 'task editor did not prefill the task title')
   check(editorEdit.includes('dsh'), 'task editor did not show the existing tag')
   check(editorEdit.includes('spec.md'), 'task editor did not show the attachment name')
@@ -653,12 +655,26 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(editorCreate.includes('class="kbn-tag-field"'), 'tag entry must use its own inline field style')
   check(editorCreate.includes('class="kbn-textarea"'), 'description textarea missing')
 
+  for (const columnStatus of ['todo', 'doing', 'done']) {
+    let created
+    const props = { open: true, mode: 'create', workspaceId: 'ws-a', columnStatus, onSaved: (task) => { created = task } }
+    render(test.TaskEditorDialog, props)
+    renderedElements.find((node) => node.type === 'textarea').props.onChange({ target: { value: 'From column' } })
+    renderedElements.length = 0
+    renderNode(React.createElement(test.TaskEditorDialog, props))
+    const save = renderedElements.find((node) => node.type === 'button' && node.props['data-variant'] === 'primary')
+    await save.props.onClick()
+    check(created?.status === columnStatus, 'new tasks must be created directly in the selected column')
+    await store.deleteTask(created.id)
+  }
+
   // Drop a batch past the former ten-file limit, then add one via the picker.
   const upload = store.uploadAttachment
   store.uploadAttachment = async (file) => ({ id: file.name, name: file.name, type: 'text/plain', size: 1 })
   try {
     let saved
-    const task = { ...tasks[0], attachments: tasks[0].attachments.slice() }
+    // The editor still has an earlier snapshot after the card moved from To do to Doing.
+    const task = { ...tasks[0], status: 'todo', attachments: tasks[0].attachments.slice() }
     const props = { open: true, mode: 'edit', task, workspaceId: task.workspaceId, onSaved: (value) => { saved = value } }
     const rerender = () => {
       renderedElements.length = 0
@@ -680,6 +696,7 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
     rerender()
     const save = renderedElements.find((node) => node.type === 'button' && node.props['data-variant'] === 'primary')
     await save.props.onClick()
+    check(saved.status === 'doing', 'saving task details must preserve a concurrent column move')
     const expected = [...task.attachments, ...files, { name: 'picked.txt' }].map((file) => file.name)
     check(intercepted && JSON.stringify(saved.attachments.map((file) => file.name)) === JSON.stringify(expected),
       'a multi-file drop and picker addition must save every attachment in order on the same task')
