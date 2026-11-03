@@ -295,6 +295,7 @@ export function normalizeTaskInput(input) {
     tags: normalizeTags(raw.tags),
     attachments: normalizeAttachments(raw.attachments),
     assignee: normalizeAssignee(raw.assignee),
+    sessionId: normalizeSessionId(raw.sessionId),
   }
 }
 
@@ -863,13 +864,14 @@ export class KanbanStore {
         tags: fields.tags,
         attachments: fields.attachments,
         assignee: fields.assignee,
-        sessionId: null,
+        sessionId: fields.sessionId,
         archived: false,
         archivedAt: null,
         order,
         createdAt: now,
         updatedAt: now,
       }
+      this._checkSessionAvailable(tasks, task, task.sessionId)
       tasks.push(task)
       return cloneTask(task)
     })
@@ -1000,8 +1002,8 @@ export class KanbanStore {
   }
 
   _checkSessionAvailable(tasks, task, sessionId) {
-    if (sessionId && tasks.some((other) => other.id !== task.id && other.sessionId === sessionId)) {
-      throw kanbanError('kanban/session-conflict', 'This session is already linked to another task.')
+    if (sessionId && tasks.some((other) => other.workspaceId !== task.workspaceId && other.sessionId === sessionId)) {
+      throw kanbanError('kanban/session-conflict', 'This session is linked to a task in another workspace.')
     }
   }
 
