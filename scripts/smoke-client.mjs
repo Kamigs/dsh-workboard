@@ -352,6 +352,7 @@ if (definition === null) throw new Error('smoke: bundle did not register a Modul
 if (definition.id !== 'dsh-workboard') throw new Error('smoke: bundle id is ' + definition.id)
 
 const nativeUI = {
+  IconChevronDownOutlineRegular: () => React.createElement('svg'),
   MenuSurface: (props) => React.createElement('section', props),
   IconPlusOutlineRegular: () => React.createElement('svg'),
   IconEditOutlineRegular: () => React.createElement('svg'),
@@ -535,6 +536,17 @@ check(boardTwo.includes('kbn-card'), 'card class missing from board markup')
 check(boardTwo.includes('kbn-col'), 'column class missing from board markup')
 check(boardOne !== null, 'first board render returned nothing')
 
+const boardSwitcher = renderedElements.find((node) => node.props.className === 'kbn-board-switcher-button')
+check(boardTwo.includes('<h1') && boardSwitcher?.props['aria-haspopup'] === 'menu',
+  'the board title should be the switcher')
+boardSwitcher.props.onClick()
+const openBoardMenu = renderNode(React.createElement(mainEntry.component, {}))
+check(openBoardMenu.includes('role="menu"') && openBoardMenu.includes('Sprint board'),
+  'the open board switcher should include standalone boards')
+boardSwitcher.props.onClick()
+renderedElements.length = 0
+renderNode(React.createElement(mainEntry.component, {}))
+
 const addBoardButtons = renderedElements.filter((node) => node.type === 'button'
   && (node.props['aria-label'] === '新建看板' || renderNode(node.props.children).includes('新建看板')))
 if (addBoardButtons.length !== 1) throw new Error('the populated board should have just one New board button')
@@ -572,7 +584,6 @@ check(editorRegistration !== undefined, 'main registration missing')
 // so verify the registered components at least render while closed.
 check(boardTwo.includes('kbn-head'), 'board header missing')
 check(boardTwo.includes('kbn-workbench'), 'workbench layout missing')
-check(boardTwo.includes('Sprint board'), 'the standalone board is missing from the board switcher')
 check(boardTwo.includes('新建看板'), 'the header must offer creating a board')
 check(boardTwo.lastIndexOf('新建看板') > boardTwo.indexOf('工作看板设置'), 'the create-board button must be the rightmost header action')
 check(boardTwo.includes('kbn-detail'), 'right-hand detail pane missing')

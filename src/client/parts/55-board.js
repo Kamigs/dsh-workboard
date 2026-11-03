@@ -241,12 +241,10 @@ function NewBoardDialog({ open, onClose }) {
     h('p', { className: 'kbn-detail-note' }, t('board.dirLaterHint'))))
 }
 
-function TaskStatusMenu({ status, busy, onChange, listClassName }) {
-  const [open, setOpen] = useState(false)
+function useMenuPlacement(open, heightLimit) {
   const [side, setSide] = useState('bottom')
   const trigger = useRef(null)
   const firstItem = useRef(null)
-  const pointer = useRef(false)
   const getAnchorRect = useCallback(() => trigger.current?.getBoundingClientRect() ?? null, [])
 
   React.useLayoutEffect(() => {
@@ -258,7 +256,9 @@ function TaskStatusMenu({ status, busy, onChange, listClassName }) {
       if (!rect) return
       // DSH reserves a 12px viewport inset and a 4px gap around the trigger.
       const below = window.innerHeight - rect.bottom - 16
-      setSide(below < menu.offsetHeight && rect.top - 16 > below ? 'top' : 'bottom')
+      const above = rect.top - 16
+      if (heightLimit) menu.style.maxHeight = Math.max(0, Math.min(heightLimit, Math.max(above, below))) + 'px'
+      setSide(below < menu.offsetHeight && above > below ? 'top' : 'bottom')
     }
     place()
     window.addEventListener('resize', place)
@@ -267,7 +267,47 @@ function TaskStatusMenu({ status, busy, onChange, listClassName }) {
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
-  }, [open, getAnchorRect])
+  }, [open, getAnchorRect, heightLimit])
+  return { trigger, firstItem, getAnchorRect, side }
+}
+
+function BoardSwitcher({ boards, board, onChange, disabled }) {
+  const [expanded, setExpanded] = useState(false)
+  const open = expanded && !disabled && boards.length > 0
+  const { trigger, firstItem, getAnchorRect, side } = useMenuPlacement(open, 360)
+  const label = t('board.selectBoard')
+  return h(DshUI.Menu, {
+    className: 'kbn-board-switcher', listClassName: 'kbn-board-options',
+    open, side, align: 'start', portal: true, autoFocus: true, getAnchorRect, minWidthFromAnchor: true,
+    selectedId: board?.id,
+    items: boards.map(({ id, title }, index) => ({
+      id, label: h('span', { ref: index === 0 ? firstItem : undefined, title }, title),
+    })),
+    onClose: () => setExpanded(false),
+    onSelect: (id) => {
+      setExpanded(false)
+      if (id !== board?.id) onChange(id)
+    },
+    anchor: h(DshUI.Button, {
+      ref: trigger, variant: 'outline', className: 'kbn-board-switcher-button',
+      disabled: disabled || !boards.length, title: board?.title || label,
+      'aria-label': board ? label + ' · ' + board.title : label, 'aria-haspopup': 'menu', 'aria-expanded': open,
+      onClick: () => setExpanded((value) => !value),
+      onKeyDown: (event) => {
+        if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+          event.preventDefault()
+          setExpanded(true)
+        }
+      },
+    }, h('span', { className: 'kbn-board-switcher-name' }, board?.title || label),
+    h(DshUI.IconChevronDownOutlineRegular, { size: 16, 'aria-hidden': true })),
+  })
+}
+
+function TaskStatusMenu({ status, busy, onChange, listClassName }) {
+  const [open, setOpen] = useState(false)
+  const { trigger, firstItem, side, getAnchorRect } = useMenuPlacement(open)
+  const pointer = useRef(false)
 
   return h('span', {
     className: 'kbn-detail-status-picker',
@@ -980,18 +1020,14 @@ function BoardPage(props) {
     h('div', { className: 'kbn-page' },
       h('header', { className: 'kbn-head' },
         h('div', { className: 'kbn-head-main' },
-          h('div', { className: 'kbn-ws-select', title: activeBoard?.title },
-            h(Select, {
-              value: activeBoardId === null ? '' : activeBoardId,
-              onChange: (value) => {
-                const next = kbnFieldValue(value)
+          h('h1', { className: 'kbn-board-heading', 'aria-label': activeBoard?.title || t('board.selectBoard') },
+            h(BoardSwitcher, {
+              boards, board: activeBoard,
+              onChange: (next) => {
                 kbnLastWorkspaceId = next
                 setSelectedTaskId(null)
                 setWorkspaceId(next)
               },
-              options: boards.map((board) => ({ value: board.id, label: board.title })),
-              placeholder: t('board.selectBoard'),
-              ariaLabel: t('board.selectBoard'),
             })),
           h('p', { className: 'kbn-subtitle' },
             activeBoard !== null

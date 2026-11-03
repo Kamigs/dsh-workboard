@@ -72,16 +72,35 @@ addStyle(`
 
 /* -------------------------------------------------------- header board switcher */
 
-.kbn-ws-select {
+.kbn-board-heading {
   align-self: flex-start;
-  display: flex;
-  align-items: center;
-  max-width: 100%;
+  max-width: min(100%, 32rem);
   min-width: 0;
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
 }
 
-.kbn-ws-select .kbn-input-wrap { width: auto; max-width: 220px; }
-.kbn-ws-select .kbn-select { field-sizing: content; width: auto; max-width: 100%; text-overflow: ellipsis; }
+.kbn-board-switcher { display: flex; min-width: 0; max-width: 100%; }
+.kbn-board-switcher .kbn-board-switcher-button {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-secondary) 76%, var(--dsw-alias-bg-base));
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-primary);
+}
+.kbn-board-heading .kbn-board-switcher-button { height: 44px; padding: 0 12px; font: inherit; }
+.kbn-board-switcher-button svg { flex: none; color: var(--dsw-alias-label-secondary); }
+.kbn-board-switcher-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbn-board-switcher-button:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+.kbn-board-options[role=menu] {
+  background: var(--dsw-alias-bg-layer-1);
+  max-width: min(32rem, calc(100vw - 24px));
+  max-height: min(360px, calc(100vh - 24px));
+}
 
 /* ----------------------------------------------------------------- columns */
 

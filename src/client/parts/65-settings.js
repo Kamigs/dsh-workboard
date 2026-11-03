@@ -147,10 +147,7 @@ function WorkboardSettings({ close }) {
     h('section', { className: 'kbn-settings-group' },
       h('h3', null, t('settings.target')),
       activeBoard ? h(Fragment, null,
-        h(Select, {
-          value: activeBoard.id, options: boards.map((board) => ({ value: board.id, label: board.title })),
-          onChange: setBoardId, ariaLabel: t('board.selectBoard'), disabled: !!importState,
-        }),
+        h(BoardSwitcher, { boards, board: activeBoard, onChange: setBoardId, disabled: !!importState }),
         h(BoardNameField, { key: activeBoard.id + ':' + activeBoard.title, board: activeBoard }))
         : h('p', null, t('board.noBoardTitle'))),
     h('section', { className: 'kbn-settings-group' },
