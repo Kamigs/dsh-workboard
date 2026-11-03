@@ -653,6 +653,42 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(editorCreate.includes('class="kbn-tag-field"'), 'tag entry must use its own inline field style')
   check(editorCreate.includes('class="kbn-textarea"'), 'description textarea missing')
 
+  // Drop a batch past the former ten-file limit, then add one via the picker.
+  const upload = store.uploadAttachment
+  store.uploadAttachment = async (file) => ({ id: file.name, name: file.name, type: 'text/plain', size: 1 })
+  try {
+    let saved
+    const task = { ...tasks[0], attachments: tasks[0].attachments.slice() }
+    const props = { open: true, mode: 'edit', task, workspaceId: task.workspaceId, onSaved: (value) => { saved = value } }
+    const rerender = () => {
+      renderedElements.length = 0
+      return renderNode(React.createElement(test.TaskEditorDialog, props))
+    }
+    render(test.TaskEditorDialog, props)
+    const mask = renderedElements.find((node) => node.props.className === 'kbn-mask')
+    const zone = renderedElements.find((node) => Object.hasOwn(node.props, 'data-file-over'))
+    zone.props.ref.current = { contains: (target) => target === zone }
+    const files = Array.from({ length: 12 }, (_, i) => ({ name: 'drop-' + i + '.txt' }))
+    let intercepted = false
+    await mask.props.onDrop({
+      type: 'drop', target: zone, preventDefault() {}, stopPropagation() { intercepted = true },
+      dataTransfer: { types: ['Files'], items: [], files },
+    })
+    rerender()
+    const picker = renderedElements.find((node) => node.props.type === 'file')
+    await picker.props.onChange({ currentTarget: { files: [{ name: 'picked.txt' }], value: 'picked.txt' } })
+    rerender()
+    const save = renderedElements.find((node) => node.type === 'button' && node.props['data-variant'] === 'primary')
+    await save.props.onClick()
+    const expected = [...task.attachments, ...files, { name: 'picked.txt' }].map((file) => file.name)
+    check(intercepted && JSON.stringify(saved.attachments.map((file) => file.name)) === JSON.stringify(expected),
+      'a multi-file drop and picker addition must save every attachment in order on the same task')
+    const reopened = render(test.TaskEditorDialog, { ...props, task: saved })
+    check(expected.every((name) => reopened.includes(name)), 'reopening the editor must show the whole saved batch')
+  } finally {
+    store.uploadAttachment = upload
+  }
+
   const archive = render(test.ArchiveDialog, { open: true, onClose() {} })
   check(archive.includes('归档任务'), 'archive dialog did not list the archived task')
   check(archive.includes('kbn-archive'), 'archive dialog class missing')

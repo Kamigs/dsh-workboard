@@ -645,6 +645,11 @@ addStyle(`
   border-color: var(--dsw-alias-border-l2);
   color: var(--dsw-alias-label-primary);
 }
+.kbn-form-row[data-file-over=true] .kbn-attach-add {
+  background: var(--dsw-alias-interactive-bg-hover);
+  border-color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-state-business-primary);
+}
 .kbn-attach-add:disabled { opacity: .4; cursor: not-allowed; }
 .kbn-attach-add > svg { flex: none; }
 

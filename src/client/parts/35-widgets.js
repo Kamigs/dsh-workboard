@@ -324,6 +324,7 @@ function Modal({
   busy = false,
   footer,
   labelledBy,
+  onFileDrag,
   children,
 }) {
   const dialogRef = useRef(null)
@@ -385,7 +386,10 @@ function Modal({
     ? { 'aria-labelledby': labelledBy }
     : { 'aria-label': title || t('widget.dialog') }
 
-  return h('div', { className: 'kbn-mask', onClick: handleMaskClick },
+  return h('div', {
+    className: 'kbn-mask', onClick: handleMaskClick,
+    onDragEnter: onFileDrag, onDragOver: onFileDrag, onDragLeave: onFileDrag, onDrop: onFileDrag,
+  },
     h('div', {
       className: 'kbn-dialog',
       role: 'dialog',
