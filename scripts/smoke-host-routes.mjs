@@ -78,7 +78,7 @@ async function call(pathname, method = 'POST', body) {
   return { status: response.status, headers: response.headers, json, text, bytes: response }
 }
 
-check(routes.size === 12, 'expected 12 registered routes, got ' + routes.size)
+check(routes.size === 13, 'expected 13 registered routes, got ' + routes.size)
 
 // state
 const state0 = await call('/api/kanban.state', 'GET')
@@ -157,6 +157,20 @@ const boardTask = await call('/api/kanban.task.create', 'POST', { workspaceId: b
 check(boardTask.status === 200, 'task in standalone board failed: ' + boardTask.text)
 const stateWithBoard = await call('/api/kanban.state', 'GET')
 check(stateWithBoard.json.boards.length === 1 && stateWithBoard.json.boards[0].title === 'Sprint board', 'standalone board not listed')
+for (const id of [boardId, 'ws-a']) {
+  const renamed = await call('/api/kanban.board.rename', 'POST', { boardId: id, title: '  Renamed  ' })
+  check(renamed.status === 200 && renamed.json.board.title === 'Renamed', 'rename failed for ' + id)
+}
+const renamedState = (await call('/api/kanban.state', 'GET')).json
+check(renamedState.boards[0].id === boardId && renamedState.boards[0].title === 'Renamed', 'standalone rename lost')
+const ws = renamedState.workspaces.find((item) => item.id === 'ws-a')
+check(ws.boardTitle === 'Renamed' && ws.title === stateWithBoard.json.workspaces.find((item) => item.id === ws.id).title, 'workspace identity changed')
+check(JSON.stringify(renamedState.tasks) === JSON.stringify(stateWithBoard.json.tasks), 'rename changed task data')
+const reopened = createStore({ dataDir })
+check((await reopened.workspaceBoards([{ id: ws.id, title: ws.title }]))[0].boardTitle === 'Renamed', 'alias lost after restart')
+await reopened.close()
+check((await call('/api/kanban.board.rename', 'POST', { boardId, title: '  ' })).status === 400, 'blank rename accepted')
+check((await call('/api/kanban.board.rename', 'POST', { boardId: 'missing', title: 'X' })).status === 404, 'unknown board accepted')
 const bound = await call('/api/kanban.board.bind', 'POST', { boardId, workspaceId: 'ws-b' })
 check(bound.status === 200 && bound.json.migrated === 1, 'board bind failed: ' + bound.text)
 const stateAfterBind = await call('/api/kanban.state', 'GET')

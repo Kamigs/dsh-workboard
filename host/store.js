@@ -497,6 +497,7 @@ export class KanbanStore {
     this.tasks = []
     /** @type {{ id: string, title: string, createdAt: string, updatedAt: string }[]} */
     this.boards = []
+    this.workspaceBoardTitles = {}
     /** @type {Map<string, { name: string, type: string, size: number }>} */
     this.attachmentIndex = new Map()
     this.taskCounter = 0
@@ -586,6 +587,10 @@ export class KanbanStore {
     }
     this.boards = boards
     this.boardCounter = highestBoard
+    if (isPlainObject(parsed.workspaceBoardTitles)) {
+      this.workspaceBoardTitles = Object.fromEntries(Object.entries(parsed.workspaceBoardTitles)
+        .filter(([, title]) => typeof title === 'string' && title.trim() !== ''))
+    }
   }
 
   /** Load the attachment metadata sidecar. */
@@ -657,11 +662,12 @@ export class KanbanStore {
 
   /** Apply one mutation to a detached draft inside the write queue. */
   async _commitTasks(change) {
-    const draft = structuredClone({ version: 1, boards: this.boards, tasks: this.tasks })
+    const draft = structuredClone({ version: 1, boards: this.boards, tasks: this.tasks, workspaceBoardTitles: this.workspaceBoardTitles })
     const result = change(draft)
     await writeJsonAtomic(this.stateFile, draft)
     this.tasks = draft.tasks
     this.boards = draft.boards
+    this.workspaceBoardTitles = draft.workspaceBoardTitles
     return result
   }
 
@@ -725,6 +731,30 @@ export class KanbanStore {
       boards.push(board)
       return cloneTask(board)
     })
+  }
+
+  /** A workspace keeps its DSH identity and directory when its board gets a display name. */
+  async renameBoard(boardId, title, isWorkspace) {
+    return this._changeTasks((draft) => {
+      const name = normalizeTitle(title)
+      if (isWorkspace) {
+        draft.workspaceBoardTitles = { ...draft.workspaceBoardTitles, [boardId]: name }
+      } else {
+        const board = draft.boards.find((item) => item.id === boardId)
+        if (!board) throw kanbanError('kanban/board-not-found', 'Board not found.')
+        board.title = name
+        board.updatedAt = new Date().toISOString()
+      }
+      return { id: boardId, title: name }
+    })
+  }
+
+  async workspaceBoards(workspaces) {
+    await this._ready
+    await this._tail
+    return workspaces.map((ws) => Object.hasOwn(this.workspaceBoardTitles, ws.id)
+      ? { ...ws, boardTitle: this.workspaceBoardTitles[ws.id] }
+      : ws)
   }
 
   /**

@@ -147,7 +147,7 @@ export function registerKanbanRoutes(ctx, store) {
       methods: ['GET'],
       handler: guard(store, async () => jsonResponse({
         ok: true,
-        workspaces: listWorkspaces(ctx),
+        workspaces: await store.workspaceBoards(listWorkspaces(ctx)),
         boards: await store.listBoards(),
         tasks: await store.list(),
       })),
@@ -158,6 +158,16 @@ export function registerKanbanRoutes(ctx, store) {
       handler: guard(store, async (request) => {
         const body = await readJsonObject(request)
         const board = await store.createBoard(body.title)
+        return jsonResponse({ ok: true, board })
+      }),
+    },
+    {
+      path: '/api/kanban.board.rename',
+      methods: ['POST'],
+      handler: guard(store, async (request) => {
+        const { boardId, title } = await readJsonObject(request)
+        const isWorkspace = listWorkspaces(ctx).some((workspace) => workspace.id === boardId)
+        const board = await store.renameBoard(boardId, title, isWorkspace)
         return jsonResponse({ ok: true, board })
       }),
     },
