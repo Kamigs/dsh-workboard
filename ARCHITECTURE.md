@@ -47,11 +47,11 @@ registry (`ctx.connection.fetch.register` on the host,
 | `src/client/parts/36-date-field.js` | `DateField`: text field + floating calendar panel (the native date popup cannot be themed) |
 | `src/client/parts/37-account.js` | signed-in DeepSeek profile via optional `remote.account.getProfile`; identity card + avatar |
 | `src/client/parts/40-card.js` | `TaskCard`, `StatusDot`, `PriorityBadge`, corner edit / send controls |
-| `src/client/parts/45-task-editor.js` | create/edit dialog with all task fields and attachments |
+| `src/client/parts/45-task-editor.js` | single-content create/edit dialog, metadata and attachment drops |
 | `src/client/parts/50-archive-modal.js` | archived-task manager (restore / delete / open session) |
 | `src/client/parts/55-board.js` | `BoardPage`: workspace switch, three columns, drag & drop, detail sheet, resizer |
 | `src/client/parts/58-attachment-preview.js` | attachment classification, thumbnail data, right-hand preview rail |
-| `src/client/parts/60-session-bridge.js` | AI-task session creation, task ↔ session navigation |
+| `src/client/parts/60-session-bridge.js` | destination/mode dialog, attachment dispatch, linked-task panel and navigation |
 | `src/client/parts/65-settings.js` | Workboard settings, board names, archive and data transfer controls |
 | `src/client/parts/90-entry.js` | `apply()`: locale, styles, store, slot registrations |
 
@@ -67,7 +67,9 @@ with `cache-control: no-store`; failures answer non-2xx with
 
 | Method | Path | Body | Result |
 |---|---|---|---|
-| GET | `/api/kanban.state` | — | `{ ok, workspaces, tasks }` |
+| GET | `/api/kanban.state` | — | `{ ok, workspaces, boards, tasks }` |
+| POST | `/api/kanban.board.create` | `{ title }` | `{ ok, board }` |
+| POST | `/api/kanban.board.bind` | `{ boardId, workspaceId }` | `{ ok, boardId, workspaceId, migrated }` |
 | POST | `/api/kanban.task.create` | `{ workspaceId, input }` | `{ ok, task }` |
 | POST | `/api/kanban.task.update` | `{ id, patch }` | `{ ok, task }` |
 | POST | `/api/kanban.task.move` | `{ id, status, beforeId? }` | `{ ok, tasks }` |
@@ -113,6 +115,12 @@ Validation lives in `host/store.js` (title 1–200 chars, description ≤ 20000,
 12 tags); unknown patch keys are ignored. Writes serialize
 through one queue and publish atomically (temp file + `fsync` + `rename`); a
 corrupt `state.json` is quarantined as `state.json.corrupt-<timestamp>`.
+
+The editor exposes one task-content field. `taskContentFields` and
+`taskContentText` map it to the legacy title/description storage fields while
+preserving paragraph breaks. New cards inherit their column's status; the
+editor does not submit status changes. Details render the body below the name
+without a separate description heading or empty-description placeholder.
 
 Attachments are not stored in the data directory by default: an upload carries
 the owning `workspaceId`, the Host resolves it through `workspaceRegistry`, and
@@ -162,7 +170,7 @@ Derived helpers: `tasksOf`, `archivedTasks`, `taskById`, `tasksForSession`,
 <Modal open onClose title icon width busy footer>{children}</Modal>
 <EmptyState icon title description action />
 <Spinner size label />
-<ToastHost />   // mounted once by BoardPage
+<ToastHost />   // mounted by BoardPage and WorkboardSettings
 ```
 
 `Input`/`TextArea`/`Select` are value-first: `onChange` receives the string, not
@@ -199,10 +207,9 @@ The board styles use Harness theme tokens. The send dialog and header menu rende
   `--dsw-alias-bg-mask-1` + `--dsw-mask-blur`, header 46–54px, 28px close.
 - Menus/popovers: `--dsw-specific-menu` + `--dsw-menu-backdrop-filter`.
 - Status tones: todo → `--dsw-alias-state-idle-primary`, doing →
-  `--dsw-alias-state-business-primary`, done → success-primary. Status is one
-  3px card accent plus the column header; card surfaces stay neutral and the
-  selection ring is always business-primary, so cards never change colour by
-  column.
+  `--dsw-alias-state-business-primary`, done → success-primary. Card accents,
+  selected-card rings and column headers use the corresponding status tone;
+  card surfaces remain neutral.
 
 ## 8. Slot registration (`90-entry.js`)
 
@@ -215,6 +222,11 @@ ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
 ctx.slots.inject('main', () => ctx.slots.register({
   name: 'main', key: 'kanban', locale: NS,
 }, BoardPage))
+
+ctx.slots.inject('settings.section', () => ctx.slots.register({
+  name: 'settings.section', id: PLUGIN_ID, order: 100, locale: NS,
+  label: () => t('panel.title'),
+}, WorkboardSettings))
 
 ctx.slots.inject('conversation.session.header.utilities', () => ctx.slots.register({
   name: 'conversation.session.header.utilities', id: 'kanban-task-link',
@@ -230,7 +242,7 @@ Navigation uses `ctx.layout.selectPanel('kanban')`, `ctx.uiWorkspace.openSession
 ```sh
 node scripts/build-client.mjs        # concatenate parts -> lib/client.js
 node scripts/verify.mjs              # manifest, exports, locales, bundle guards
-node --test                          # host store tests
+node --test                          # storage, archival and session dispatch tests
 node scripts/smoke-host-routes.mjs   # every host route through a fake registry
 node scripts/smoke-client.mjs        # render every surface without a browser
 ```
@@ -267,7 +279,12 @@ and `.kbn-preview-*`; `59-data-transfer.js` → `.kbn-data-*`, `.kbn-import-*` a
   `90-entry.js` before any slot registers.
 - `60-session-bridge.js` declares hoisted functions the board calls from event
   handlers: `dispatchTask(task, destination, mode)` and `openTaskSession(task)`.
-  The board and archive dialog call the task store directly to archive and restore individual cards.
+  It links the card before sending and prepares every attachment first. Images
+  become native image content blocks; other files use `fileUpload.upload` for
+  the target session. Only an accepted execution prompt advances To do to
+  Doing. Discussion and AI reply completion do not change task status.
+  The board and archive list call the task store directly to archive and restore
+  individual cards without archiving or restoring the session.
 - `37-account.js` declares the optional account read the editor and card use:
   `loadKbnAccount(ctx)`, `useKbnAccount()`, `kbnAccountMatchesTask()`.
 - `58-attachment-preview.js` declares `kbnAttachmentKind`,
@@ -278,12 +295,19 @@ and `.kbn-preview-*`; `59-data-transfer.js` → `.kbn-data-*`, `.kbn-import-*` a
   `dsh-kanban:detail-width` (retained for preference compatibility); the displayed width follows the space available inside
   the DSH panel. Narrow panels place the selected task below the columns. Widening
   the panel restores the preferred width. Double-clicking the splitter clears it.
+- The selected board is remembered under `dsh-workboard:selected-board`.
+  Returning to the panel, reloading or restarting restores that board while it
+  still exists. Settings maintain a separate selection for the import target.
 
 ## 12. Data import / export
 
 The header gear opens the Workboard section in DSH’s `settings.section` slot.
-It provides board display names, archived tasks, import and export. Workspace
-board names are stored in the plugin’s `workspaceBoardTitles` map by workspace ID.
+Its sections appear in this order: board list, archived tasks, data transfer.
+Sections use dividers; individual board rows remain compact bordered controls.
+Archive groups show their three most recent tasks with a per-group expand
+button for the rest. Settings toasts appear at the dialog's bottom right.
+Workspace board names are stored in the plugin’s `workspaceBoardTitles` map
+by workspace ID; they do not rename the Harness workspace or directory.
 
 Export (`kbnExportPayload` + a Blob download) writes one document:
 
@@ -309,8 +333,8 @@ Export (`kbnExportPayload` + a Blob download) writes one document:
 
 Import (`kbnParseImport` + `kbnImportTasks`) accepts that document, legacy
 `dsh-kanban` exports, or a bare task array. It clamps to 1000 tasks, normalizes
-each field, skips unrecognized records, and creates the rest in the project
-currently selected on the board. Ids, session
+each field, skips unrecognized records, and creates the rest in the board
+selected in Workboard settings. Ids, session
 links, attachment bytes and archived state intentionally do not cross the
 boundary; the dialog states this before the user confirms. Repeating an import is
 safe because it only ever creates tasks.

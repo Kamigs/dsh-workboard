@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Send-task dialog with new, eligible current, or linked session destinations
+  and discussion/execution modes; task attachments travel with the brief.
+- Toggleable conversation task panel with per-task status, board navigation,
+  editing and task creation.
+- Native DSH Workboard settings with inline board renaming, board creation,
+  per-board archive previews and data import/export.
+- Persistent board selection and standalone boards that bind a working
+  directory when first used for an AI session.
+- Attachment drag and drop without an attachment-count limit.
+
+### Changed
+
+- One task-content editor replaces separate title and description inputs;
+  task details place the body immediately below the name.
+- Discussion preserves task status; execution moves accepted To do tasks to
+  Doing. AI reply completion never marks a task Done automatically.
+- Archive and restore affect individual cards and preserve their session links.
+- Board names replace the page title and open an anchored menu. The subtitle
+  lists counts for all three states; narrow layouts preserve readable columns.
+- Settings sections use dividers, compact board rows and icon-only rename
+  controls. Each board's three most recent archived tasks remain visible.
+
+### Fixed
+
+- Board rename persistence, menu placement, duplicate status labels,
+  status-coloured selection rings and card action alignment.
+- Conversation-panel toggle contrast and positioning within the conversation.
+- Archive heading contrast and left alignment, compact heading/description
+  spacing, centred empty states and bottom-right settings notifications.
+
 ## [0.1.0] - 2026-11-03
 
 ### Added

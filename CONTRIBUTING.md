@@ -8,7 +8,7 @@ whole development loop runs on plain Node.js (>= 22) with no dependencies.
 ```sh
 node scripts/build-client.mjs        # rebuild lib/client.js from src/client/parts
 node scripts/verify.mjs              # manifest / exports / locales / bundle guards
-node --test                          # host store unit tests
+node --test                          # storage, archival and session dispatch tests
 node scripts/smoke-host-routes.mjs   # every host route through a fake registry
 node scripts/smoke-client.mjs        # render every browser surface without a browser
 ```

@@ -6,8 +6,8 @@
 A DeepSeek Harness (DSH) plugin that adds a **Workboard** to the left sidebar.
 Every Harness workspace gets its own board with three permanently visible columns
 (To do / Doing / Done). Tasks carry dates, urgency, tags, attachments and an
-assignee (AI or the signed-in account). An AI task can spawn a Harness session
-that executes it. Cards and sessions link to each other.
+assignee (AI or the signed-in account). AI tasks can be sent to Harness sessions
+for discussion or execution. Cards and sessions link to each other.
 
 [中文](README.md) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md)
 
@@ -15,15 +15,20 @@ that executes it. Cards and sessions link to each other.
 
 - **Sidebar entry + central board panel** registered through the Harness slot
   system, so icon, navigation and layout follow the host.
-- **Workspace-scoped boards**: switching workspace switches the board; create a
-  project from the board (pick a directory → DSH workspace).
+- **Workspace and standalone boards**: each workspace has its own board. Create
+  a standalone board without a directory, then choose a working directory when
+  sending its first AI task. The title menu remembers your last board selection.
 - **Three always-visible columns** — To do (grey) / Doing (blue) / Done (green).
   An empty column shows an in-column placeholder instead of replacing the board;
   cards drag across columns and reorder before/after other cards.
-- **Full task fields**: title, description, status, start date, due date,
-  urgency (low / medium / high / urgent), tags, attachments, assignee, session.
-- **Detail sheet** on the right (a deliberately different UI form from the
-  columns) with fields, description, tags, attachments and actions. Image
+- **Task editor**: one content field holds the first-line summary and details,
+  alongside dates, priority, tags, attachments and assignee. New tasks inherit
+  their column's status; move cards by dragging or using a status menu in the
+  details or linked-task panel.
+- **Attachments**: select or drop files with no attachment-count limit. Images
+  and files are included with the brief when sending a task to a session.
+- **Detail sheet** shows the body directly below the task name, followed by
+  status, dates, tags, attachments and actions. Image
   attachments show a large preview plus a thumbnail strip of every attachment;
   video / audio / text / other files open in a right-hand preview rail.
 - **Send an AI task**. Choose a new session, the linked session, or the eligible current session in the same workspace. Discussion keeps the card in its column. Executing a queued task moves it from To do to Doing. Users mark completion on the board.
@@ -90,9 +95,10 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
 4. Tasks assigned to **AI** show a blue circular send button at the card's
    bottom right; choose the destination and send mode there.
 5. Click a card to open its details. Select a new status to move it to that column.
-6. Choose **Archive task** in the details. Open Workboard settings and expand Archived tasks to restore or delete a task.
+6. Choose **Archive task** in the details. Open Workboard settings to see the three most recent archived tasks per board. Expand a board's remaining tasks, restore a task or delete it there.
 7. Open settings from the header gear. The vertical board list provides **Edit name** on each row,
-   with Enter to save and Escape to cancel. Select a board as the import target or export tasks from all boards.
+   with Enter to save and Escape to cancel. The list header also offers **New board**.
+   Select a board as the import target or export tasks from all boards.
 
 ## Data and configuration
 
@@ -101,7 +107,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
   (file name `<attachmentId>-<original name>`); the plugin data directory keeps
   `attachments/index.json` with name/type/size and the workspace reference.
   Legacy files in the data directory are still readable. Attachments have **no
-  plugin-level size limit** (one JSON request body is bounded at 256 MiB and DSH
+  plugin-level count or size limit** (one JSON request body is bounded at 256 MiB and DSH
   Connection applies its own `maxRequestBodyBytes`). Add `.dsh/` to the project's
   `.gitignore` if you do not want attachment files in version control.
 - Writes serialize and publish atomically (temp file + `fsync` + `rename`); a
@@ -116,7 +122,8 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
       dataDir: ~/Documents/kanban
   ```
 
-- Everything stays on this machine; the HTTP surface is mounted under DSH
+- Board data and attachments are stored locally. Sending an AI task passes its
+  content and attachments to the model used by the target session. The HTTP surface is mounted under DSH
   Connection's authenticated `/api` channel and only answers the signed-in
   local browser.
 
@@ -124,7 +131,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
 
 ```sh
 npm run build       # concat src/client/parts -> lib/client.js
-npm test            # host store unit tests (11)
+npm test            # storage, archival and session dispatch tests
 npm run test:smoke  # host routes end-to-end + browser-half render smoke (no browser)
 npm run check       # everything above plus static checks
 ```
@@ -140,7 +147,7 @@ host/routes.js            authenticated /api/kanban.* routes
 lib/client.js             generated browser bundle (committed)
 src/client/parts/*.js     browser sources, concatenated into one factory scope
 scripts/                  build, static verification, host-route and render smokes
-test/                     host store tests
+test/                     storage, archival and session dispatch tests
 locale/                   plugin display metadata (en/zh)
 icon.svg, cordis.patch.yml
 ```
