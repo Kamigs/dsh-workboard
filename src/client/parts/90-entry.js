@@ -82,6 +82,6 @@ function apply(ctx) {
 }
 
 return {
-  inject: ['slots', 'locale', 'layout', 'sessions', 'uiWorkspace', 'workspaces'],
+  inject: ['slots', 'locale', 'layout', 'sessions', 'uiWorkspace', 'workspaces', 'fileUpload'],
   apply,
 }
