@@ -316,6 +316,8 @@ function createKanbanStore(ctx) {
    */
   async function bindBoard(boardId, workspaceId) {
     await apiPost(KANBAN_API_PATHS.boardBind, { boardId, workspaceId })
+    // Migrate the selected identity before refreshing away the standalone board.
+    if (kbnLastWorkspaceId === boardId) kbnRememberBoard(workspaceId)
     await refresh()
   }
 

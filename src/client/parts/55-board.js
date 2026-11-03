@@ -169,8 +169,29 @@ function kbnClampDetailWidth(width, limits) {
   return Math.min(limits.max, Math.max(limits.min, Number.isFinite(rounded) ? rounded : limits.fallback))
 }
 
-/** Last workspace shown in this page's lifetime; panel switches return to it. */
-let kbnLastWorkspaceId = null
+/** Keep board identity across panel mounts, reloads and desktop restarts. */
+const KBN_SELECTED_BOARD_KEY = 'dsh-workboard:selected-board'
+
+function kbnReadSelectedBoard() {
+  try {
+    return localStorage.getItem(KBN_SELECTED_BOARD_KEY) || null
+  } catch {
+    return null
+  }
+}
+
+let kbnLastWorkspaceId = kbnReadSelectedBoard()
+
+function kbnRememberBoard(boardId) {
+  if (boardId === kbnLastWorkspaceId) return
+  kbnLastWorkspaceId = boardId
+  try {
+    if (boardId === null) localStorage.removeItem(KBN_SELECTED_BOARD_KEY)
+    else localStorage.setItem(KBN_SELECTED_BOARD_KEY, boardId)
+  } catch {
+    // The in-memory selection still works when browser storage is unavailable.
+  }
+}
 
 /**
  * Create a standalone board. A board does not need a working directory; the
@@ -733,20 +754,23 @@ function BoardPage(props) {
 
   // Keep a valid board selected and remember the last one.
   useEffect(() => {
+    // Loading and failed requests cannot tell us whether a saved board is gone.
+    if (state.status !== 'ready') return
     if (boards.length === 0) {
+      kbnRememberBoard(null)
       if (workspaceId !== null) setWorkspaceId(null)
       return
     }
     if (workspaceId !== null && boardOf(state, workspaceId) !== null) {
-      kbnLastWorkspaceId = workspaceId
+      kbnRememberBoard(workspaceId)
       return
     }
     const fallback = kbnLastWorkspaceId !== null && boardOf(state, kbnLastWorkspaceId) !== null
       ? kbnLastWorkspaceId
       : boards[0].id
-    kbnLastWorkspaceId = fallback
+    kbnRememberBoard(fallback)
     setWorkspaceId(fallback)
-  }, [state.workspaces, state.boards, workspaceId])
+  }, [state.status, state.workspaces, state.boards, workspaceId])
 
   // A preview belongs to the selected task; drop it when the selection moves.
   useEffect(() => {
@@ -769,7 +793,7 @@ function BoardPage(props) {
       store.refresh()
       return
     }
-    kbnLastWorkspaceId = task.workspaceId
+    kbnRememberBoard(task.workspaceId)
     setWorkspaceId(task.workspaceId)
     setSelectedTaskId(id)
   }, [state.revision])
@@ -1024,7 +1048,7 @@ function BoardPage(props) {
             h(BoardSwitcher, {
               boards, board: activeBoard,
               onChange: (next) => {
-                kbnLastWorkspaceId = next
+                kbnRememberBoard(next)
                 setSelectedTaskId(null)
                 setWorkspaceId(next)
               },
@@ -1096,7 +1120,7 @@ function BoardPage(props) {
       onClose: (board) => {
         setBoardOpen(false)
         if (board !== null && board !== undefined && typeof board.id === 'string') {
-          kbnLastWorkspaceId = board.id
+          kbnRememberBoard(board.id)
           setWorkspaceId(board.id)
           setSelectedTaskId(null)
         }

@@ -85,7 +85,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
 ## Usage
 
 1. Click the board icon in the left sidebar.
-2. Switch boards in the header, or select **New board** to create a standalone board.
+2. Switch boards in the header, or select **New board** to create a standalone board. Your selection is saved locally and restored when you return, reload or restart DSH.
 3. Create a task (or use a column's `+`) and enter its summary on the first line with details below.
 4. Tasks assigned to **AI** show a blue circular send button at the card's
    bottom right; choose the destination and send mode there.

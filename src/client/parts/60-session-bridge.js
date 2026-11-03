@@ -208,7 +208,6 @@ async function ensureBoardWorkspace(task) {
   } catch {
     // The workspace keeps its directory-derived title; binding still succeeded.
   }
-  kbnLastWorkspaceId = workspaceId
   kanbanStore.toast(t('bridge.bind.done', { title: board.title }), 'info')
   return workspaceId
 }
