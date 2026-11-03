@@ -376,8 +376,7 @@ function TaskDetailPanel({
         : null,
       h('div', { className: 'kbn-detail-chips' },
         h('span', { className: 'kbn-detail-status', 'data-status': status },
-          h(StatusDot, { status }),
-          t('status.' + status)),
+          h(StatusDot, { status })),
         h('span', { className: 'kbn-detail-status', 'data-kind': isAI ? 'ai' : 'human' },
           showAccountAvatar
             ? h(KbnAccountAvatar, { profile: accountProfile, size: 18 })
