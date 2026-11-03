@@ -4,7 +4,7 @@
  */
 addDict(
   {
-    'board.subtitle': '{open} 个未完成 · {done} 个已完成',
+    'board.subtitle': '{todo} 个待办 · {doing} 个进行中 · {done} 个已完成',
     'board.subtitleEmpty': '选择或新建一个项目开始',
     'board.selectBoard': '选择看板',
     'board.newBoard': '新建看板',
@@ -51,7 +51,7 @@ addDict(
     'board.dirLaterHint': '工作目录会在第一次把 AI 任务发送到会话时再选择。',
   },
   {
-    'board.subtitle': '{open} open · {done} done',
+    'board.subtitle': '{todo} to do · {doing} in progress · {done} done',
     'board.subtitleEmpty': 'Choose or create a project to begin',
     'board.selectBoard': 'Select board',
     'board.newBoard': 'New board',
@@ -990,8 +990,6 @@ function BoardPage(props) {
       }, items))
   }
 
-  const openCount = boardTasks.filter((task) => task.status !== 'done').length
-  const doneCount = boardTasks.filter((task) => task.status === 'done').length
   const inlineError = state.status === 'error' && typeof state.error === 'string' && state.error !== ''
     ? h('div', { className: 'kbn-error-bar', role: 'alert' },
       h(Icon, { name: 'warning', size: 14 }),
@@ -1061,7 +1059,7 @@ function BoardPage(props) {
             })),
           h('p', { className: 'kbn-subtitle' },
             activeBoard !== null
-              ? t('board.subtitle', { open: openCount, done: doneCount })
+              ? t('board.subtitle', { todo: tasksByStatus.todo.length, doing: tasksByStatus.doing.length, done: tasksByStatus.done.length })
               : t('board.subtitleEmpty'))),
         h('div', { className: 'kbn-head-actions' },
           h(DshUI.Button, {

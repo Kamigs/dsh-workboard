@@ -77,8 +77,8 @@ addStyle(`
   max-width: min(100%, 32rem);
   min-width: 0;
   margin: 0;
-  font-size: 22px;
-  line-height: 28px;
+  font-size: 18px;
+  line-height: 24px;
   font-weight: 600;
 }
 
@@ -88,11 +88,11 @@ addStyle(`
   min-width: 0;
   justify-content: space-between;
   gap: 10px;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-label-secondary) 76%, var(--dsw-alias-bg-base));
+  border: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-primary);
 }
-.kbn-board-heading .kbn-board-switcher-button { height: 44px; padding: 0 12px; font: inherit; }
+.kbn-board-heading .kbn-board-switcher-button { height: 36px; padding: 0 10px; font: inherit; }
 .kbn-board-switcher-button svg { flex: none; color: var(--dsw-alias-label-secondary); }
 .kbn-board-switcher-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kbn-board-switcher-button:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
