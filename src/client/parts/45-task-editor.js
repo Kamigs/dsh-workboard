@@ -367,7 +367,7 @@ function TaskEditorDialog({ open, mode, task, workspaceId, columnStatus, onClose
         })),
 
       h('div', { className: 'kbn-form-grid' },
-        h('div', { className: 'kbn-form-row', 'data-span': 'full' },
+        h('div', { className: 'kbn-form-row' },
           h(Field, { label: t('editor.priority') },
             h(Select, {
               value: priority,
@@ -375,6 +375,36 @@ function TaskEditorDialog({ open, mode, task, workspaceId, columnStatus, onClose
               options: priorityOptions,
               ariaLabel: t('editor.priority'),
             }))),
+        h('div', { className: 'kbn-form-row' },
+          h(Field, { label: t('editor.tags') },
+            h('div', {
+              className: 'kbn-tag-input',
+              onClick: () => {
+                if (tagInputRef.current !== null) tagInputRef.current.focus()
+              },
+            },
+              tags.map((tag, index) => h('span', { className: 'kbn-tag-pill', key: tag + ':' + index },
+                h('span', { title: tag }, tag),
+                h('button', {
+                  type: 'button',
+                  className: 'kbn-tag-x',
+                  'aria-label': t('editor.tagRemove', { tag }),
+                  title: t('editor.tagRemove', { tag }),
+                  onClick: (event) => {
+                    if (event !== null && event !== undefined) event.stopPropagation()
+                    removeTag(index)
+                  },
+                }, h(Icon, { name: 'close', size: 12 })))),
+              h('input', {
+                ref: tagInputRef,
+                className: 'kbn-tag-field',
+                value: tagDraft,
+                placeholder: tags.length === 0 ? t('editor.tagPlaceholder') : '',
+                'aria-label': t('editor.tags'),
+                onChange: (event) => setTagDraft(event.target.value),
+                onKeyDown: handleTagKeyDown,
+                maxLength: KBN_MAX_TAG_LENGTH,
+              })))),
         h('div', { className: 'kbn-form-row' },
           h(Field, { label: t('editor.startDate') },
             h(DateField, {
@@ -391,37 +421,6 @@ function TaskEditorDialog({ open, mode, task, workspaceId, columnStatus, onClose
                 if (errors.dueDate !== undefined) setErrors(Object.assign({}, errors, { dueDate: undefined }))
               },
               ariaLabel: t('editor.dueDate'),
-            })))),
-
-      h('div', { className: 'kbn-form-row' },
-        h(Field, { label: t('editor.tags') },
-          h('div', {
-            className: 'kbn-tag-input',
-            onClick: () => {
-              if (tagInputRef.current !== null) tagInputRef.current.focus()
-            },
-          },
-            tags.map((tag, index) => h('span', { className: 'kbn-tag-pill', key: tag + ':' + index },
-              h('span', { title: tag }, tag),
-              h('button', {
-                type: 'button',
-                className: 'kbn-tag-x',
-                'aria-label': t('editor.tagRemove', { tag }),
-                title: t('editor.tagRemove', { tag }),
-                onClick: (event) => {
-                  if (event !== null && event !== undefined) event.stopPropagation()
-                  removeTag(index)
-                },
-              }, h(Icon, { name: 'close', size: 12 })))),
-            h('input', {
-              ref: tagInputRef,
-              className: 'kbn-tag-field',
-              value: tagDraft,
-              placeholder: tags.length === 0 ? t('editor.tagPlaceholder') : '',
-              'aria-label': t('editor.tags'),
-              onChange: (event) => setTagDraft(event.target.value),
-              onKeyDown: handleTagKeyDown,
-              maxLength: KBN_MAX_TAG_LENGTH,
             })))),
 
       h('div', { className: 'kbn-form-row kbn-assignee-block', 'data-span': 'full' },
