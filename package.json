@@ -1,6 +1,6 @@
 {
   "name": "dsh-workboard",
-  "version": "0.1.0",
+  "version": "0.1.0-beta-pre",
   "description": "Workspace-scoped task boards for DeepSeek Harness: To do / Doing / Done cards with dates, priority, tags, attachments, AI-task sessions and archival.",
   "license": "MIT",
   "author": "Kamigs",

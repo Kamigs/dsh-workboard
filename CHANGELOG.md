@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta-pre] - 2026-11-04
+
 ### Added
 
 - Workboard home with searchable cards for every workspace and standalone
@@ -44,6 +46,8 @@ All notable changes to this project are documented here. The format follows
   excluded. Imported Done tasks record new completions on the import date.
 - Architecture and release documentation live under `docs/`; npm packages
   exclude development sources, scripts and tests through an explicit file list.
+- Chinese and English READMEs now follow installation and daily workflows,
+  using the public GitHub repository as the default installation source.
 
 - One task-content editor replaces separate title and description inputs;
   task details place the body immediately below the name.

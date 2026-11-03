@@ -3,209 +3,153 @@
 [![CI](https://github.com/Kamigs/dsh-workboard/actions/workflows/ci.yml/badge.svg)](https://github.com/Kamigs/dsh-workboard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A DeepSeek Harness (DSH) plugin whose sidebar entry opens a home page with a
-completion heatmap, every workspace and standalone board, and shared idea notes.
-Open a board card to reach three permanently visible columns
-(To do / Doing / Done). Tasks carry dates, urgency, tags, attachments and an
-assignee (AI or the signed-in account). AI tasks can be sent to Harness sessions
-for discussion or execution. Cards and sessions link to each other.
+Manage tasks, review completions and capture ideas inside DeepSeek Harness (DSH). Send AI tasks to conversations for discussion or execution.
 
-[中文](README.md) · [Architecture](docs/ARCHITECTURE.md) · [Changelog](CHANGELOG.md) · [Packaging and release](docs/RELEASING.md)
+The **Workboard** sidebar entry opens a home page with every board, a yearly completion heatmap and shared idea notes. Open a board card to reach its **To do / Doing / Done** columns. Tasks and their linked DSH conversations provide shortcuts to each other.
 
-## Features
-
-- **Home entry**: the sidebar opens the overview, including after a reload or
-  restart. Search board cards showing their directory and unarchived task
-  counts, open a card to enter its three-column board, and choose **Back**
-  to return home.
-- **Workspace and standalone boards**: the home page lists every workspace and
-  standalone board. Create a standalone board without a directory, then choose
-  a working directory when
-  sending its first AI task. The board title menu still switches between boards.
-- **Completion heatmap**: always shows the latest 52 weeks, including the current
-  week. Square cells and gaps scale with the available width; ultrawide screens
-  add equal margins around the centered chart.
-  Dates use the browser's local calendar; each task counts once per day.
-  Recording starts when this feature is enabled; old task timestamps do not
-  backfill history. Archiving or deleting a task preserves its completion events.
-- **Idea notes**: shared across boards, with six colors, quick entry, search,
-  editing and deletion. Card footers show the update date or save status.
-  Add a new note with the button or `⌘ / Ctrl + Enter`; existing-note edits
-  save after 600ms of inactivity. Failed saves retain the draft for retry.
-- **Three always-visible columns** — To do (grey) / Doing (blue) / Done (green).
-  An empty column shows an in-column placeholder instead of replacing the board;
-  cards drag across columns and reorder before/after other cards.
-- **Task editor**: one content field holds the first-line summary and details,
-  alongside dates, priority, tags, attachments and assignee. New tasks inherit
-  their column's status; move cards by dragging or using a status menu in the
-  details or linked-task panel.
-- **Attachments**: select or drop files with no attachment-count limit. Images
-  and files are included with the brief when sending a task to a session.
-- **Detail sheet** shows the body directly below the task name, followed by
-  status, dates, tags, attachments and actions. Image
-  attachments show a large preview plus a thumbnail strip of every attachment;
-  video / audio / text / other files open in a right-hand preview rail.
-- **Send an AI task**. Choose a new session, the linked session, or the eligible current session in the same workspace. Discussion keeps the card in its column. Executing a queued task moves it from To do to Doing. Users mark completion on the board.
-- **Linked tasks**. Open the list in the conversation header to see every unarchived task linked to that session. Each card has a status dropdown, a shortcut to its board, and an edit button. The plus button creates a task linked to the current session.
-- **Archive** tasks in any column from their details. Restoring a task returns
-  its card to the original column with its session link intact.
-- **Import / export**: the Workboard section in Settings exports every task as
-  JSON and imports a JSON document into the current project (new tasks only —
-  attachments, sessions and archived state are not migrated). Task JSON does
-  not include notes or completion history.
-- **Resizable splitter** between board and detail sheet; the chosen width is
-  remembered (localStorage, across reloads), double-click resets it, and the
-  maximum width adapts to the window so the three columns never collapse.
-- **DSH-matched UI**: direct host icon exports and native DSH UI primitives for
-  home-page buttons, inputs, inline editing, tooltips and dialogs. `--dsw-*`
-  tokens, light/dark themes and zh/en copy follow the host; the six note accents
-  blend with the host background and use its text colors.
-
-## Requirements
-
-- Tested with DeepSeek Harness `0.2.1-rc.5` in Desktop and Web profiles.
-- `engines.dsh` declares `>=0.2.1-rc.5 <0.3.0`. This is a compatibility policy,
-  not a claim that every version in that range has been tested. Recheck the UI
-  after upgrading DSH; prereleases with other version tuples are not included.
-- Node.js >= 22. No npm runtime dependencies: React and DSH UI primitives come
-  from the host's browser module table.
+[中文](README.md) · [GitHub repository](https://github.com/Kamigs/dsh-workboard) · [Changelog](CHANGELOG.md)
 
 ## Install
 
-This is a DSH **bundle plugin**: `package.json` and `cordis.patch.yml` declare
-its entry. The prebuilt `lib/client.js` is committed. These commands use an
-installed `dsh` CLI; use the `desktop` profile for Desktop or `web` for Web.
+Verified with DSH `0.2.1-rc.5` in Desktop and Web profiles. The manifest declares `>=0.2.1-rc.5 <0.3.0`; other versions require separate verification.
 
-### From a local tarball
+### Install from GitHub
 
-Run `npm run pack` in the development checkout to build, check and package it:
+With the `dsh` CLI installed, add the plugin to the profile you use.
+
+**Desktop:**
 
 ```sh
-dsh plugin --profile desktop add ./dist/dsh-workboard-0.1.0.tgz
+dsh plugin --profile desktop add github:Kamigs/dsh-workboard
 ```
 
-Restart that DSH instance. Web users should replace `desktop` with `web`.
+**Web:**
 
-### From a local checkout
+```sh
+dsh plugin --profile web add github:Kamigs/dsh-workboard
+```
 
-Run from the plugin root:
+Restart that DSH instance, then open **Workboard** in its sidebar. Replace `desktop` or `web` if you use a custom profile name.
+
+The source is [the main branch of Kamigs/dsh-workboard](https://github.com/Kamigs/dsh-workboard/tree/main). It includes the prebuilt `lib/client.js`, so you do not need to run this project's build command first. GitHub installs follow the public `main` branch; use a local package or linked checkout for changes that have not been published there.
+
+See the [official DSH plugin installation guide](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/develop/basic/publish.md) for the installation mechanism.
+
+### Install a local package
+
+From an existing source checkout, using Node.js 22 or later and npm:
+
+```sh
+npm run pack
+dsh plugin --profile desktop add ./dist/dsh-workboard-0.1.0-beta-pre.tgz
+```
+
+`npm run pack` builds, checks and packages the plugin, verifies an installation in a temporary directory, and writes a SHA-256 checksum. For Web, replace `desktop` with `web`. Restart the corresponding instance after installation.
+
+## Start from home
+
+- **Open a board:** home lists every workspace board and standalone board, with its working directory and unarchived task counts. Search by name or directory, then open a card.
+- **Create a board:** choose **New board** to create a standalone board without a working directory. Select the directory when sending its first AI task.
+- **Return home:** choose **Back** in the board details or select the sidebar entry again. The board-title menu switches boards directly. Reloads and restarts begin at home.
+
+Wide panels place boards and ideas side by side; narrower panels stack them. Card grids adapt to the available width. Icons come directly from DSH exports, and home-page buttons, inputs, editors, tooltips and dialogs use native DSH components, following the host's light/dark theme and Chinese/English setting.
+
+### Review completions
+
+The heatmap always displays the latest **52 weeks**, including the current week. Resizing changes square-cell sizes and gaps; ultrawide panels add equal margins around the centered grid. Month labels stay on one row, while the heading and explanatory text stay aligned with the page content edge.
+
+Counts use the browser's local calendar:
+
+- Creating a task as **Done**, or moving it into **Done** from another state, records a completion event.
+- The same task counts once per day. It can count again on another day.
+- Recording starts when this feature is enabled. Old task timestamps do not backfill history, and archiving or deleting a task preserves existing completion records.
+
+Hover over a cell for its date and count. Arrow keys navigate dates; `Home` selects the first day and `End` selects today.
+
+### Capture an idea
+
+Notes are shared across all boards. They support six colors, multiline text, search, editing and deletion.
+
+1. Write an idea on home, choose a color and select **Add note**, or press `⌘ / Ctrl + Enter`.
+2. Use a saved note's edit button to change it. Edits save automatically after **600ms** of inactivity. The footer retains the update date and shows the save status.
+3. Failed saves keep the draft and offer **Retry save**. Deletion requires confirmation.
+
+Each note supports up to 4,000 characters. When browser storage is available, unsubmitted content and pending edits are kept as local drafts across reloads.
+
+## Manage tasks on a board
+
+Use a column's `+` to create a task in that status. The task editor has one content field: put the summary on the first line and details below. You can also set start and due dates, priority, tags, attachments and an assignee.
+
+- Drag cards across columns or reorder them. Status menus in the task details and linked-task panel also move cards.
+- Open a card to view its body, dates, attachments and linked conversation. Drag the divider between the board and details to resize the panel; double-click to reset it. The chosen width is remembered.
+- Select or drop attachments. Images have a large preview and thumbnails; video, audio, text and other files open in the right-hand preview rail.
+
+### Send a task to AI
+
+Assign a task to **AI**, then select its send button. Choose a new conversation, the linked conversation, or an eligible current conversation in the same workspace. A standalone board asks for a working directory on its first send.
+
+| Send mode | Task status |
+| --- | --- |
+| Discuss first | Sends the task content and preserves its current status |
+| Execute directly | Moves a **To do** task to **Doing** after its message is queued |
+
+The task body and attachments go to the selected conversation together. Users confirm completion on the board.
+
+The linked-task button in the conversation header shows every unarchived task associated with that conversation. Change status, edit a task or jump to its board there; the panel's `+` creates and links a new task.
+
+### Archive, restore and transfer tasks
+
+Archive a task from its details in any status. The gear opens **Settings → Workboard**, where you can browse archived tasks by board, expand more entries, restore or delete them. Restoring returns a task to its original column and preserves the conversation link. The settings board list also supports renaming and creating boards.
+
+Task JSON exports cover all boards. An import appends new tasks to the selected target board without replacing existing tasks. Attachment files, conversation links and archived state are not restored by import; notes and completion history are excluded from task JSON. Imported Done tasks count as completions on the import date.
+
+## Store and back up data
+
+| Data | Default location | Details |
+| --- | --- | --- |
+| Boards, tasks, notes and completion events | `$DSH_HOME/kanban/state.json` | `DSH_HOME` defaults to `~/.dsh` |
+| Attachment files | `<workspace>/.dsh/assets/kanban/` | Filenames include the attachment ID and original name; falls back to the plugin data directory when no working directory is available |
+| Attachment index | `$DSH_HOME/kanban/attachments/index.json` | Stores metadata and workspace references |
+| Unsubmitted or pending note drafts | Browser `localStorage` | Uses `dsh-workboard:note-drafts`; drafts stay in memory only when browser storage is unavailable |
+
+A full backup includes the plugin data directory and each workspace's attachment directory. Task JSON is for task transfer, not a full backup; browser drafts do not replace saved data either.
+
+The plugin does not impose an attachment-count or per-file size cap. Uploads are still subject to its **256 MiB request-body limit** and DSH Connection limits. Add `.dsh/` to a workspace's `.gitignore` if those local files should stay out of Git.
+
+To change the plugin data directory, override its configuration in the corresponding profile's `cordis.patch.yml`:
+
+```yaml
+- id: kanban
+  config:
+    dataDir: ~/Documents/kanban
+```
+
+Task and note writes use a serial queue and atomic file replacement. Plugin endpoints use DSH Connection's authenticated channel.
+
+## Develop locally
+
+From the plugin source root:
 
 ```sh
 npm run build
 dsh plugin --profile desktop add .
 ```
 
-The directory is linked. Rebuild and refresh after browser changes; reload the
-plugin or restart the instance after Host or manifest changes.
+The checkout is linked into the profile. Rebuild and refresh after browser-source changes; reload the plugin or restart the instance after Host or manifest changes.
 
-### After public release
+There are no third-party npm runtime dependencies. DSH supplies React and UI components.
 
-Publishing the GitHub repository and npm package are separate steps. Use these
-commands once the corresponding source/version is public:
+| Command | Purpose |
+| --- | --- |
+| `npm run build` | Concatenate `src/client/parts/` into `lib/client.js` |
+| `npm test` | Check storage, dispatch, completions and note saves |
+| `npm run test:smoke` | Check Host routes and client UI entries |
+| `npm run check` | Build, verify and run all tests |
+| `npm run pack` | Run all checks, package, verify an isolated installation and generate a checksum |
 
-```sh
-# The GitHub checkout must contain the built lib/client.js.
-dsh plugin --profile desktop add github:Kamigs/dsh-workboard
+`lib/client.js` is the prebuilt browser file shipped with the plugin. Regenerate and commit it with source changes. Generated files in `dist/` stay out of Git.
 
-# Only after this version is published to npm.
-dsh plugin --profile desktop add dsh-workboard@0.1.0
-```
-
-The package ships prebuilt entries and has no `prepare`, `install` or
-`postinstall` hook. Pin a verified commit or tag for repeatable GitHub installs.
-See [Packaging and release](docs/RELEASING.md) for the maintainer workflow.
-
-## Usage
-
-1. Click the board icon in the left sidebar to open the home page with its heatmap, boards and idea notes.
-2. Open a board card or select **New board** to create a standalone board. Switch boards in the detail header; choose **Back** or the sidebar entry to return home. Task links from conversations still open the relevant board and task directly.
-3. Create a task (or use a column's `+`) and enter its summary on the first line with details below.
-4. Tasks assigned to **AI** show a blue circular send button at the card's
-   bottom right; choose the destination and send mode there.
-5. Click a card to open its details. Select a new status to move it to that column.
-6. Choose **Archive task** in the details. Open Workboard settings to see the three most recent archived tasks per board. Expand a board's remaining tasks, restore a task or delete it there.
-7. Open settings from the header gear. The vertical board list provides **Edit name** on each row,
-   with Enter to save and Escape to cancel. The list header also offers **New board**.
-   Select a board as the import target or export tasks from all boards.
-8. Write an idea on the home page, choose a color and select **Add note**.
-   Use a card's footer edit button to change it; edits save automatically.
-   Choose **Retry save** after a failure. Deleting a note requires confirmation.
-
-## Data and configuration
-
-- Tasks, boards, global notes and completion events:
-  `$DSH_HOME/kanban/state.json` (`DSH_HOME` defaults to `~/.dsh`). Notes are not
-  owned by a workspace.
-- A completion event is written when a task is created as Done or enters Done
-  from another state; the heatmap deduplicates repeated completions per task/day.
-  Imported Done tasks are new tasks and count on the import date, without
-  restoring their original completion dates.
-- Unsubmitted notes and pending edits use the browser's
-  `dsh-workboard:note-drafts` localStorage entry for recovery after a reload.
-  If browser storage is unavailable, drafts remain in memory only. This cache
-  does not replace a backup of saved data.
-- Attachments: stored in the owning workspace at `<workspace>/.dsh/assets/kanban/`
-  (file name `<attachmentId>-<original name>`); the plugin data directory keeps
-  `attachments/index.json` with name/type/size and the workspace reference.
-  Legacy files in the data directory are still readable. Attachments have **no
-  plugin-level count or size limit** (one JSON request body is bounded at 256 MiB and DSH
-  Connection applies its own `maxRequestBodyBytes`). Add `.dsh/` to the project's
-  `.gitignore` if you do not want attachment files in version control.
-- Writes serialize and publish atomically (temp file + `fsync` + `rename`); a
-  corrupt document is quarantined as `state.json.corrupt-<timestamp>` and the
-  board starts empty instead of failing.
-- Optional configuration, overriding the `kanban` row in the profile's
-  `cordis.patch.yml`:
-
-  ```yaml
-  - id: kanban
-    config:
-      dataDir: ~/Documents/kanban
-  ```
-
-- Boards, notes, completion history and attachments are stored locally. Sending an AI task passes its
-  content and attachments to the model used by the target session. The HTTP surface is mounted under DSH
-  Connection's authenticated `/api` channel and only answers the signed-in
-  local browser.
-
-## Development
-
-```sh
-npm run build       # concat src/client/parts -> lib/client.js
-npm test            # storage, archival, dispatch, heatmap and note-save tests
-npm run test:smoke  # host routes end-to-end + browser-half render smoke (no browser)
-npm run check       # everything above plus static checks
-npm run pack        # build, check, pack and test an isolated installation
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Layout
-
-```
-index.js                  host entry (injects connection / workspaceRegistry)
-host/store.js             tasks, notes, completions, validation, persistence, attachments
-host/routes.js            authenticated /api/kanban.* routes
-lib/client.js             generated browser bundle (committed)
-src/client/parts/*.js     browser sources, concatenated into one factory scope
-scripts/                  build, static verification, host-route and render smokes
-test/                     storage, archival, dispatch, home and note-save tests
-locale/                   plugin display metadata (en/zh)
-icon.svg, cordis.patch.yml
-docs/                     Architecture and release instructions
-dist/                     Verified tarball and SHA-256 (generated, gitignored)
-```
-
-The checkout contains sources and tests. The installable package contains only
-runtime files, icons, locales and documentation. `host/` is executable plain
-JavaScript; `lib/` contains the committed browser build output.
-
-## Notes
-
-- The home page, send dialog and session task menu use Harness UI primitives directly; icons reference host exports.
-- Account identity is read through the optional `remote.account.getProfile`.
-  Without a signed-in account the assignee falls back to plain "Human" and
-  everything else keeps working.
+Read more: [Contributing](CONTRIBUTING.md) · [Architecture and data contracts](docs/ARCHITECTURE.md) · [Packaging and release](docs/RELEASING.md).
 
 ## License
 

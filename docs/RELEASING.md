@@ -66,7 +66,7 @@ npm run pack
 执行顺序为：
 
 1. `npm run pack` 先执行 `prepack`，运行完整的 `npm run check`：构建、静态校验、单元测试及两类冒烟检查。
-2. 将允许发布的文件打成 `dist/dsh-workboard-0.1.0.tgz`。
+2. 将允许发布的文件打成 `dist/dsh-workboard-0.1.0-beta-pre.tgz`。
 3. 在临时消费项目里离线安装这个 `.tgz`，禁用安装生命周期脚本。
 4. 对安装后的文件再次校验 manifest、入口导出、本地化、全部 Host 路由和浏览器界面入口。
 5. 生成同名 `.tgz.sha256`，删除临时消费项目。
@@ -78,9 +78,9 @@ npm run pack
 检查生成文件：
 
 ```sh
-tar -tzf dist/dsh-workboard-0.1.0.tgz
+tar -tzf dist/dsh-workboard-0.1.0-beta-pre.tgz
 cd dist
-shasum -a 256 -c dsh-workboard-0.1.0.tgz.sha256
+shasum -a 256 -c dsh-workboard-0.1.0-beta-pre.tgz.sha256
 ```
 
 ## 在 DSH 中验收
@@ -88,7 +88,7 @@ shasum -a 256 -c dsh-workboard-0.1.0.tgz.sha256
 使用已安装的 DSH CLI，把安装包加入用于验收的 profile：
 
 ```sh
-dsh plugin --profile workboard-release-check add ./dist/dsh-workboard-0.1.0.tgz
+dsh plugin --profile workboard-release-check add ./dist/dsh-workboard-0.1.0-beta-pre.tgz
 dsh --profile workboard-release-check --dump-config
 ```
 
@@ -115,10 +115,10 @@ dsh --profile workboard-release-check --dump-config
 ### npm（可选渠道）
 
 先确认 npm 包名可用、账号具备发布权限、版本尚未使用，并将已完成的变更归入相应版本。
-再发布已经验证的安装包，例如当前版本：
+再发布已经验证的安装包。当前预发布版本使用 `beta-pre` 分发标签：
 
 ```sh
-npm publish ./dist/dsh-workboard-0.1.0.tgz --access public
+npm publish ./dist/dsh-workboard-0.1.0-beta-pre.tgz --tag beta-pre --access public
 ```
 
 该命令会公开上传包，不能用来代替本地打包检查。已有版本不能覆盖。
