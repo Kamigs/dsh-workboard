@@ -27,7 +27,7 @@ that executes it. Cards and sessions link to each other.
   attachments show a large preview plus a thumbnail strip of every attachment;
   video / audio / text / other files open in a right-hand preview rail.
 - **Send an AI task**. Choose a new session, the linked session, or the eligible current session in the same workspace. Discussion keeps the card in its column. Executing a queued task moves it from To do to Doing. Users mark completion on the board.
-- **Linked tasks**. In a linked session, toggle the task list in the header to see board status. Select a task to reveal its card.
+- **Linked tasks**. Open the list in the conversation header to see every unarchived task linked to that session. Each card has a status dropdown, a shortcut to its board, and an edit button. The plus button creates a task linked to the current session.
 - **Archive** tasks in any column from their details. Restoring a task returns
   its card to the original column with its session link intact.
 - **Import / export**: the Workboard section in Settings exports every task as

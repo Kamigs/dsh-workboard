@@ -112,7 +112,7 @@ function taskContentText({ title, description }) {
  * @param {{ open: boolean, mode: 'create' | 'edit', task?: object | null, workspaceId?: string | null, columnStatus?: string, onClose: Function, onSaved?: Function }} props
  * @returns {object} React element
  */
-function TaskEditorDialog({ open, mode, task, workspaceId, columnStatus, onClose, onSaved }) {
+function TaskEditorDialog({ open, mode, task, workspaceId, columnStatus, sessionId, onClose, onSaved }) {
   const isEdit = mode === 'edit' && task !== null && task !== undefined
   const [content, setContent] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -284,7 +284,7 @@ function TaskEditorDialog({ open, mode, task, workspaceId, columnStatus, onClose
     try {
       const saved = isEdit
         ? await kanbanStore.updateTask(task.id, payload)
-        : await kanbanStore.createTask(workspaceId, { ...payload, status: columnStatus })
+        : await kanbanStore.createTask(workspaceId, { ...payload, status: columnStatus, sessionId })
       kanbanStore.toast(t('editor.saved'), 'info')
       if (typeof onSaved === 'function') onSaved(saved)
       if (typeof onClose === 'function') onClose()

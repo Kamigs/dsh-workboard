@@ -352,6 +352,10 @@ if (definition === null) throw new Error('smoke: bundle did not register a Modul
 if (definition.id !== 'dsh-workboard') throw new Error('smoke: bundle id is ' + definition.id)
 
 const nativeUI = {
+  MenuSurface: (props) => React.createElement('section', props),
+  IconPlusOutlineRegular: () => React.createElement('svg'),
+  IconEditOutlineRegular: () => React.createElement('svg'),
+  IconRightUpOutlineRegular: () => React.createElement('svg'),
   IconSettingsOutlineMedium: () => React.createElement('svg'),
   IconFlatListOutlineRegular: () => React.createElement('svg'),
   Pill: ({ children }) => React.createElement('span', {}, children),
@@ -367,6 +371,10 @@ const nativeUI = {
 
 const plugin = definition.factory((specifier) => {
   if (specifier === 'react') return React
+  if (specifier === 'react-dom') return { createPortal: (child, container) => {
+    portalTargets.push(container)
+    return child
+  } }
   if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return nativeUI
   throw new Error('smoke: unexpected require(' + specifier + ')')
 })
@@ -374,6 +382,7 @@ if (typeof plugin.apply !== 'function') throw new Error('smoke: client half has 
 if (!Array.isArray(plugin.inject)) throw new Error('smoke: client half has no inject array')
 
 /* ------------------------------------------------------------------ fake context */
+const portalTargets = []
 const sessionArchiveCalls = []
 const registrations = []
 const disposers = []
@@ -537,24 +546,19 @@ check(afterAddClick.includes('kbn-project-dialog'), 'the header New board button
 const linked = render(linkEntry.component, { sessionId: 'session-abc' })
 check(linked.includes('aria-label="关联任务"') && !linked.includes('实现任务看板插件'), 'task menu should start collapsed')
 const trigger = renderedElements.find((node) => node.props['aria-label'] === '关联任务')
-let bodyBounds = { top: 80, right: 960, width: 800 }
-const conversationBody = { dataset: { conversationSession: 'session-abc' }, getBoundingClientRect: () => bodyBounds }
+const conversationBody = { dataset: { conversationSession: 'session-abc' } }
 const conversationRoot = { querySelector: (selector) => selector === '[data-conversation-content]' ? conversationBody : null }
 const headerClick = { currentTarget: { closest: (selector) => selector === '[data-phase]' ? conversationRoot : null } }
 trigger.props.onClick(headerClick)
 const menu = renderNode(React.createElement(linkEntry.component, { sessionId: 'session-abc' }))
 check(menu.includes('实现任务看板插件') && menu.includes('进行中') && !menu.includes('写归档弹窗'),
   'expanded menu should show only the linked task and its board status')
-const measureAnchor = renderedElements.find((node) => node.props.role === 'menu').props.getAnchorRect
-let anchor = measureAnchor()
-check(anchor.x + anchor.width === 944 && anchor.y === 88 && anchor.width === 288,
-  'the task menu should anchor below the tabs at the right edge of the conversation body')
-bodyBounds = { top: 96, right: 400, width: 240 }
-anchor = measureAnchor()
-check(anchor.x === 176 && anchor.width === 208 && anchor.y === 104,
-  'the open menu should follow the resized conversation and fit its width')
+check(portalTargets.at(-1) === conversationBody, 'the linked task panel must mount inside its session content')
+check(menu.includes('aria-label="新建任务"') && menu.includes('aria-label="编辑任务"') &&
+  menu.includes('在工作看板中查看') && menu.includes('aria-label="修改任务状态"') &&
+  !menu.includes('role="tablist"'), 'linked task controls missing')
 trigger.props.onClick(headerClick)
-check(!renderNode(React.createElement(linkEntry.component, { sessionId: 'session-abc' })).includes('role="menu"'),
+check(!renderNode(React.createElement(linkEntry.component, { sessionId: 'session-abc' })).includes('role="dialog"'),
   'second trigger click should collapse the task menu')
 const unrelated = render(linkEntry.component, { sessionId: 'session-other' })
 check(unrelated === '', 'session header link rendered for an unrelated session')

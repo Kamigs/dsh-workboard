@@ -241,7 +241,7 @@ function NewBoardDialog({ open, onClose }) {
     h('p', { className: 'kbn-detail-note' }, t('board.dirLaterHint'))))
 }
 
-function TaskStatusMenu({ status, busy, onChange }) {
+function TaskStatusMenu({ status, busy, onChange, listClassName }) {
   const [open, setOpen] = useState(false)
   const [side, setSide] = useState('bottom')
   const trigger = useRef(null)
@@ -275,7 +275,7 @@ function TaskStatusMenu({ status, busy, onChange }) {
     onKeyDownCapture: () => { pointer.current = false },
   }, h(DshUI.Menu, {
     open, side, align: 'start', portal: true, autoFocus: true, getAnchorRect,
-    selectedId: status,
+    selectedId: status, listClassName,
     items: STATUSES.map((id, i) => ({
       id, label: h('span', { ref: i === 0 ? firstItem : undefined }, t('status.' + id)),
     })),

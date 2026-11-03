@@ -36,6 +36,7 @@ addDict(
     'send.relink': '发送后，任务将关联到所选会话。',
     'bridge.sessionTitle': '[任务] {title}',
     'bridge.link.label': '关联任务',
+    'bridge.link.reveal': '在工作看板中查看「{title}」',
     'bridge.error.noWorkspace': '找不到任务所在的工作区',
     'bridge.error.create': '创建会话失败：{message}',
     'bridge.error.link': '未能关联会话，任务尚未发送。{message}',
@@ -72,6 +73,7 @@ addDict(
     'send.relink': 'Sending will link the task to the selected session.',
     'bridge.sessionTitle': '[Task] {title}',
     'bridge.link.label': 'Linked tasks',
+    'bridge.link.reveal': 'Show “{title}” on the Workboard',
     'bridge.error.noWorkspace': 'The task workspace could not be found',
     'bridge.error.create': 'Could not create a session: {message}',
     'bridge.error.link': 'Could not link the session. The brief was not sent. {message}',
@@ -356,50 +358,118 @@ function TaskLinkAction({ sessionId }) {
 
 function SessionTaskMenu({ sessionId, tasks }) {
   const [content, setContent] = useState(null)
+  const [editor, setEditor] = useState(null)
+  const trigger = useRef(null)
+  const panel = useRef(null)
+  const id = 'kbn-linked-' + sessionId
   const open = content !== null
+  const dismiss = useCallback(() => setContent(null), [])
+  useEffect(() => {
+    if (open) panel.current?.focus({ preventScroll: true })
+  }, [open])
+  useEffect(() => {
+    if (!open || editor) return
+    function onPointerDown(event) {
+      // DSH portals the card's status menu to the document body.
+      if (event.composedPath().some((node) => node === panel.current || node === trigger.current ||
+        node.classList?.contains('kbn-session-status-menu'))) return
+      dismiss()
+    }
+    function onEscape(event) {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.stopPropagation()
+      dismiss()
+      trigger.current?.focus()
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [open, editor, dismiss])
+
   function toggle(event) {
     const root = event.currentTarget.closest('[data-phase]')
     const body = root?.querySelector('[data-conversation-content]')
     setContent((current) => !current && body?.dataset.conversationSession === sessionId ? body : null)
   }
-  // The native menu adds a 4px gap below this virtual anchor. Reading the
-  // content bounds on placement follows sidebar resizing without tracking scroll.
-  const getAnchorRect = useCallback(() => {
-    if (!content) return null
-    const bounds = content.getBoundingClientRect()
-    const width = Math.min(288, Math.max(0, bounds.width - 32))
-    return new DOMRect(bounds.right - 16 - width, bounds.top + 8, width, 0)
-  }, [content])
   const label = t('bridge.link.label')
-  const items = [{ type: 'label', id: 'heading', text: label }, ...tasks.map((task) => ({
-    id: task.id,
-    label: h('span', { className: 'kbn-session-task-row' },
-      h('span', { className: 'kbn-session-task-name', title: task.title }, task.title),
-      h(DshUI.Pill, { className: 'kbn-session-task-status', 'data-status': task.status }, t('status.' + task.status))),
-  }))]
-  return h(DshUI.Menu, {
-    open, align: 'end', portal: true, autoFocus: true, getAnchorRect, minWidthFromAnchor: true,
-    items, listClassName: 'kbn-session-tasks',
-    onClose: () => setContent(null),
-    onSelect: (id) => {
-      setContent(null)
-      kanbanStore.setFocusTask(id)
-      kanbanStore.ctx.layout.selectPanel(PANEL_ID)
-    },
-    anchor: h(DshUI.Button, {
-      variant: open ? 'toolbar' : 'ghost', size: 'sm', title: label,
-      'aria-label': label, 'aria-haspopup': 'menu', 'aria-expanded': open,
+  function reveal(task) {
+    dismiss()
+    kanbanStore.setFocusTask(task.id)
+    kanbanStore.ctx.layout.selectPanel(PANEL_ID)
+  }
+  return h(Fragment, null,
+    h(DshUI.Button, {
+      ref: trigger, className: 'kbn-session-trigger', variant: 'ghost', size: 'sm', title: label,
+      'aria-label': label, 'aria-haspopup': 'dialog', 'aria-expanded': open, 'aria-controls': open ? id : undefined,
       onClick: toggle,
     }, h(DshUI.IconFlatListOutlineRegular, { size: 16 })),
-  })
+    open && createPortal(h(DshUI.MenuSurface, {
+      id, ref: panel, role: 'dialog', tabIndex: -1, 'aria-label': label, className: 'kbn-session-tasks',
+    }, h('div', { className: 'kbn-session-tasks-head' },
+      h('strong', null, label),
+      h(DshUI.Button, {
+        variant: 'ghost', size: 'sm', title: t('editor.newTitle'), 'aria-label': t('editor.newTitle'),
+        onClick: () => setEditor({ mode: 'create' }),
+      }, h(DshUI.IconPlusOutlineRegular, { size: 16 }))),
+    h('ul', { className: 'kbn-session-task-list' }, tasks.map((task) =>
+      h(SessionTaskRow, { key: task.id, task, onReveal: reveal, onEdit: () => setEditor({ mode: 'edit', task }) })))), content),
+    editor && createPortal(h(TaskEditorDialog, {
+      open: true, mode: editor.mode, task: editor.task, workspaceId: tasks[0].workspaceId,
+      sessionId, columnStatus: 'todo', onClose: () => setEditor(null),
+    }), document.body))
+}
+
+function SessionTaskRow({ task, onEdit, onReveal }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  async function changeStatus(status) {
+    if (busy || status === task.status) return
+    setBusy(true)
+    setError(null)
+    try {
+      await kanbanStore.moveTask(task.id, status)
+    } catch (err) {
+      setError(t('toast.failed', { message: messageOf(err) }))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const revealLabel = t('bridge.link.reveal', { title: task.title })
+  return h('li', { className: 'kbn-session-task-row', 'aria-label': task.title },
+    h('div', { className: 'kbn-session-task-line' },
+      h('span', { className: 'kbn-session-task-title', title: task.title }, task.title),
+      h(TaskStatusMenu, {
+        status: task.status, busy, onChange: changeStatus, listClassName: 'kbn-session-status-menu',
+      }),
+      h('div', { className: 'kbn-session-task-actions' },
+        h(DshUI.Button, {
+          variant: 'ghost', size: 'sm', title: revealLabel, 'aria-label': revealLabel, onClick: () => onReveal(task),
+        }, h(DshUI.IconRightUpOutlineRegular, { size: 15 })),
+        h(DshUI.Button, {
+          variant: 'ghost', size: 'sm', title: t('editor.editTitle'), 'aria-label': t('editor.editTitle'), onClick: onEdit,
+        }, h(DshUI.IconEditOutlineRegular, { size: 14 })))),
+    error && h('span', { role: 'alert', className: 'kbn-editor-error' }, error))
 }
 
 addStyle(`
-/* DSH sets the surface's minimum width from the conversation anchor. */
-.kbn-session-tasks { width: 0; }
-.kbn-session-task-row { display: flex; align-items: center; gap: 12px; width: 100%; }
-.kbn-session-task-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.kbn-session-task-status { flex: none; }
-.kbn-session-task-status[data-status=doing] { color: var(--dsw-alias-state-business-primary); }
-.kbn-session-task-status[data-status=done] { color: var(--dsw-alias-state-success-primary); }
+.kbn-session-trigger[aria-expanded=true] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.kbn-session-tasks { position: absolute; z-index: 10; inset-block-start: 12px; inset-inline-end: 16px;
+  display: flex; flex-direction: column; width: min(400px, calc(100% - 32px)); max-height: calc(100% - 24px);
+  box-sizing: border-box; padding: 8px; outline: none; color: var(--dsw-alias-label-primary);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l1); box-shadow: var(--dsw-elevation-prominent); }
+.kbn-session-tasks-head { display: flex; align-items: center; justify-content: space-between; padding-inline-start: 8px;
+  font-size: 13px; color: var(--dsw-alias-label-secondary); }
+.kbn-session-task-list { display: flex; flex-direction: column; gap: 6px; list-style: none; margin: 4px 0 0; padding: 0;
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.kbn-session-task-row { padding: 7px 8px;
+  border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); background: var(--dsw-alias-bg-layer-1); }
+.kbn-session-task-title { min-width: 0; max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kbn-session-task-line { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.kbn-session-task-actions { display: flex; flex: none; align-items: center; gap: 2px; margin-inline-start: auto; }
+.kbn-session-task-actions button { width: 26px; height: 26px; padding: 0; color: var(--dsw-alias-label-secondary); }
+.kbn-session-task-line .kbn-detail-status-picker { flex: none; }
+.kbn-session-task-row [role=alert] { width: 100%; overflow-wrap: anywhere; }
 `)

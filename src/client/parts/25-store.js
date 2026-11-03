@@ -250,28 +250,13 @@ function createKanbanStore(ctx) {
   }
 
   /**
-   * Delete one task (optimistic removal, restored on failure).
+   * Keep the task and its editor mounted until the host confirms deletion.
    * @param {string} id
    * @returns {Promise<void>}
    */
   async function deleteTask(id) {
-    const previous = taskById(snapshot, id)
-    const index = snapshot.tasks.findIndex((item) => item !== null && item.id === id)
-    if (index >= 0) {
-      const tasks = snapshot.tasks.slice()
-      tasks.splice(index, 1)
-      commit({ tasks })
-    }
-    try {
-      await apiPost(KANBAN_API_PATHS.delete, { id })
-    } catch (error) {
-      if (previous !== null) {
-        const tasks = snapshot.tasks.slice()
-        tasks.splice(Math.min(index < 0 ? tasks.length : index, tasks.length), 0, previous)
-        commit({ tasks })
-      }
-      throw error
-    }
+    await apiPost(KANBAN_API_PATHS.delete, { id })
+    commit({ tasks: snapshot.tasks.filter((task) => task.id !== id) })
   }
 
   /**
