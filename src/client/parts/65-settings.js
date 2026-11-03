@@ -1,13 +1,19 @@
 /** Workboard contributes one section to the DSH settings shell. */
 addDict({
   'settings.open': '工作看板设置',
-  'settings.target': '当前看板',
+  'settings.target': '看板列表',
+  'settings.editName': '编辑名称',
+  'settings.renameUnavailable': '看板改名接口暂不可用，请重启 DSH 后重试。',
+  'settings.boardMissing': '该看板已不存在，请重新打开设置。',
   'settings.saved': '看板名称已保存',
   'settings.exportAll': '导出所有看板的任务。导入的任务会添加到上方选中的看板。',
   'settings.unavailable': 'DSH 设置暂时不可用，请重新打开看板后重试。',
 }, {
   'settings.open': 'Workboard settings',
-  'settings.target': 'Current board',
+  'settings.target': 'Boards',
+  'settings.editName': 'Edit name',
+  'settings.renameUnavailable': 'The board rename endpoint is unavailable. Restart DSH and try again.',
+  'settings.boardMissing': 'This board no longer exists. Reopen settings.',
   'settings.saved': 'Board name saved',
   'settings.exportAll': 'Export tasks from all boards. Imported tasks are added to the board selected above.',
   'settings.unavailable': 'DSH settings are unavailable. Reopen the board and try again.',
@@ -21,30 +27,86 @@ function openWorkboardSettings(ctx) {
   else kanbanStore.toast(t('settings.unavailable'), 'error')
 }
 
-function BoardNameField({ board }) {
+function SettingsBoardRow({ board, selected, onSelect, disabled }) {
   const [name, setName] = useState(board.title)
+  const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const rowRef = useRef(null)
+  const saving = useRef(false)
   const title = name.trim()
+
+  function finishEditing() {
+    setEditing(false)
+    setError('')
+    setTimeout(() => rowRef.current?.querySelector('.kbn-board-name-action')?.focus(), 0)
+  }
+
   async function save(event) {
     event.preventDefault()
-    if (!title || title === board.title || busy) return
+    if (saving.current || disabled) return
+    if (!editing) {
+      setName(board.title)
+      setError('')
+      setEditing(true)
+      return
+    }
+    if (!title) return
+    if (title === board.title) {
+      finishEditing()
+      return
+    }
+    saving.current = true
     setBusy(true)
     setError('')
     try {
       await kanbanStore.renameBoard(board.id, title)
+      finishEditing()
       kanbanStore.toast(t('settings.saved'), 'info')
     } catch (failure) {
-      setError(messageOf(failure))
+      if (failure.code === 'kanban/board-not-found') setError(t('settings.boardMissing'))
+      else if (failure.status === 404) setError(t('settings.renameUnavailable'))
+      else setError(messageOf(failure))
     } finally {
+      saving.current = false
       setBusy(false)
     }
   }
-  return h('form', { onSubmit: save },
-    h(Field, { label: t('board.nameLabel') },
-      h('div', { className: 'kbn-settings-actions' },
-        h(Input, { value: name, onChange: setName, ariaLabel: t('board.nameLabel'), maxLength: 80, disabled: busy }),
-        h(DshUI.Button, { type: 'submit', variant: 'outline', size: 'sm', disabled: busy || !title || title === board.title }, t('common.save')))),
+
+  function handleKeyDown(event) {
+    if (!editing) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      if (!saving.current) finishEditing()
+    }
+    if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault()
+  }
+
+  return h('li', { ref: rowRef, className: 'kbn-settings-board', 'data-selected': selected, 'data-editing': editing, onKeyDown: handleKeyDown },
+    h('input', {
+      type: 'radio', name: 'kbn-settings-board', checked: selected,
+      'aria-label': board.title, onChange: onSelect, disabled: disabled || busy,
+    }),
+    h('form', { className: 'kbn-board-name-form', onSubmit: save, 'aria-busy': busy },
+      editing ? h(Input, {
+        value: name, onChange: (value) => { setName(value); setError('') },
+        ariaLabel: t('board.nameLabel'), maxLength: 80, disabled: busy, autoFocus: true,
+      }) : h('button', { type: 'button', className: 'kbn-board-name', onClick: onSelect, disabled, title: board.title }, board.title),
+      h(DshUI.Button, {
+        className: 'kbn-board-name-action', type: 'submit', variant: 'ghost', size: 'sm',
+        disabled: busy || disabled || (editing && !title), loading: busy,
+        'aria-label': (editing ? t('common.save') : t('settings.editName')) + ' · ' + board.title,
+      },
+      h('span', { className: 'kbn-board-name-caption kbn-board-name-edit', 'aria-hidden': true },
+        h(DshUI.IconEditOutlineRegular, { size: 16 }), t('settings.editName')),
+      h('span', { className: 'kbn-board-name-caption kbn-board-name-save', 'aria-hidden': true },
+        h(Icon, { name: 'check', size: 16 }), t('common.save'))),
+      editing && h(DshUI.Button, {
+        type: 'button', variant: 'ghost', size: 'sm', disabled: busy,
+        'aria-label': t('common.cancel'), onClick: finishEditing,
+        icon: h(Icon, { name: 'close', size: 16 }),
+      })),
     error && h('p', { className: 'kbn-import-error', role: 'alert' }, error))
 }
 
@@ -146,9 +208,11 @@ function WorkboardSettings({ close }) {
   return h('div', { className: 'kbn-settings' },
     h('section', { className: 'kbn-settings-group' },
       h('h3', null, t('settings.target')),
-      activeBoard ? h(Fragment, null,
-        h(BoardSwitcher, { boards, board: activeBoard, onChange: setBoardId, disabled: !!importState }),
-        h(BoardNameField, { key: activeBoard.id + ':' + activeBoard.title, board: activeBoard }))
+      activeBoard ? h('ul', { className: 'kbn-settings-boards', 'aria-label': t('settings.target') },
+        boards.map((board) => h(SettingsBoardRow, {
+          key: board.id, board, selected: board.id === activeBoard.id,
+          onSelect: () => setBoardId(board.id), disabled: !!importState,
+        })))
         : h('p', null, t('board.noBoardTitle'))),
     h('section', { className: 'kbn-settings-group' },
       h('h3', null, t('data.trigger')),
@@ -185,4 +249,20 @@ addStyle(`
 .kbn-settings-group > .kbn-empty { min-height: 0; padding: 16px; }
 .kbn-settings-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .kbn-settings-actions .kbn-input-wrap { flex: 1; min-width: 100px; }
+.kbn-settings-boards { display: grid; gap: 8px; padding: 0; list-style: none; }
+.kbn-settings-board { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); }
+.kbn-settings-board[data-selected="true"] { background: var(--dsw-alias-interactive-bg-hover); }
+.kbn-settings-board > input { margin: 0; width: 16px; height: 16px; accent-color: var(--dsw-alias-label-primary); }
+.kbn-settings-board .kbn-import-error { grid-column: 2; margin: 0; }
+.kbn-board-name-form { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.kbn-board-name-form > .kbn-input-wrap { flex: 1; min-width: 0; }
+.kbn-board-name { flex: 1; min-width: 0; height: 36px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.kbn-board-name-action { display: grid !important; order: 1; flex-shrink: 0; min-width: 84px; }
+.kbn-board-name-caption { grid-area: 1 / 1; display: flex; align-items: center; justify-content: center; gap: 6px; pointer-events: none; transition: opacity 180ms ease, transform 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+.kbn-board-name-save { opacity: 0; transform: translateY(5px) scale(.96); }
+.kbn-settings-board[data-editing="true"] .kbn-board-name-edit { opacity: 0; transform: translateY(-5px) scale(.96); }
+.kbn-settings-board[data-editing="true"] .kbn-board-name-save { opacity: 1; transform: translateY(0) scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  .kbn-board-name-caption { transition: none; }
+}
 `)

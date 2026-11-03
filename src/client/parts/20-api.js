@@ -62,7 +62,10 @@ async function kanbanRequest(path, init) {
     }
     if (!response.ok || (body !== null && body.ok === false)) {
       const hostMessage = body !== null && typeof body.error === 'string' ? body.error.trim() : ''
-      throw new Error(hostMessage !== '' ? hostMessage : t('api.httpError', { status: response.status }))
+      throw Object.assign(new Error(hostMessage !== '' ? hostMessage : t('api.httpError', { status: response.status })), {
+        status: response.status,
+        code: typeof body?.code === 'string' ? body.code : undefined,
+      })
     }
     return body
   } catch (error) {

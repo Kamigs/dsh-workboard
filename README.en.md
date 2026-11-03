@@ -91,8 +91,8 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
    bottom right; choose the destination and send mode there.
 5. Click a card to open its details. Select a new status to move it to that column.
 6. Choose **Archive task** in the details. Open Workboard settings and expand Archived tasks to restore or delete a task.
-7. Use the header gear to rename a board, export all tasks as JSON or import a JSON export
-   into the current project.
+7. Open settings from the header gear. The vertical board list provides **Edit name** on each row,
+   with Enter to save and Escape to cancel. Select a board as the import target or export tasks from all boards.
 
 ## Data and configuration
 

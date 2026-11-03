@@ -256,6 +256,10 @@ async function fakeFetch(url, init) {
     const board = { id: 'board_new', title: payload.title, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
     hostBoards = hostBoards.concat([board])
     body = { ok: true, board }
+  } else if (path.endsWith('/api/kanban.board.rename')) {
+    hostBoards = hostBoards.map((board) => board.id === payload.boardId ? { ...board, title: payload.title } : board)
+    hostWorkspaces = hostWorkspaces.map((ws) => ws.id === payload.boardId ? { ...ws, boardTitle: payload.title } : ws)
+    body = { ok: true, board: { id: payload.boardId, title: payload.title } }
   } else if (path.endsWith('/api/kanban.board.bind')) {
     hostTasks = hostTasks.map((item) => (item.workspaceId === payload.boardId
       ? Object.assign({}, item, { workspaceId: payload.workspaceId })
@@ -780,7 +784,21 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   gear?.props.onClick()
   check(openedSection === settings.options.id, 'header gear must open the registered native section')
   const section = render(settings.component, { close() {} })
-  check(['看板名称', '归档任务', '导入数据', '导出数据'].every((label) => section.includes(label)), 'settings actions missing')
+  check(['看板列表', '编辑名称', '归档任务', '导入数据', '导出数据'].every((label) => section.includes(label)), 'settings actions missing')
+  check(!section.includes('kbn-board-switcher'), 'settings must list all boards instead of a switcher')
+  const settingsBoards = test.boardsOf(store.getSnapshot())
+  check(settingsBoards.every((board) => section.includes(board.title)), 'settings must show every board')
+  check(renderedElements.filter((node) => node.props.type === 'radio').length === settingsBoards.length, 'each board needs a data import selector')
+  const tasksBeforeRename = JSON.stringify(store.getSnapshot().tasks)
+  for (const board of [settingsBoards.find((board) => board.bound), settingsBoards.find((board) => !board.bound)]) {
+    const title = board.title + ' renamed'
+    await store.renameBoard(board.id, title)
+    check(test.boardOf(store.getSnapshot(), board.id).title === title, 'renamed title missing in current state')
+    await store.refresh()
+    check(test.boardOf(store.getSnapshot(), board.id).title === title, 'renamed title missing after refresh')
+    await store.renameBoard(board.id, board.title)
+  }
+  check(JSON.stringify(store.getSnapshot().tasks) === tasksBeforeRename, 'renaming must preserve task identities and sessions')
 
   const boardDialog = render(test.NewBoardDialog, { open: true, onClose() {} })
   check(boardDialog.includes('新建看板'), 'the new-board dialog is missing its title')
