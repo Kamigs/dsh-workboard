@@ -373,6 +373,7 @@ if (typeof plugin.apply !== 'function') throw new Error('smoke: client half has 
 if (!Array.isArray(plugin.inject)) throw new Error('smoke: client half has no inject array')
 
 /* ------------------------------------------------------------------ fake context */
+const sessionArchiveCalls = []
 const registrations = []
 const disposers = []
 const localeRegistrations = []
@@ -441,8 +442,8 @@ const ctx = {
   uiWorkspace: {
     openSession() {},
     async connectWorkspace() { return 'session-new' },
-    async archiveSession() {},
-    async unarchiveSession() {},
+    async archiveSession(id) { sessionArchiveCalls.push(id) },
+    async unarchiveSession(id) { sessionArchiveCalls.push(id) },
     async pickDirectory() { return '/Users/me/new-project' },
   },
   workspaces: {
@@ -855,10 +856,21 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(store.getSnapshot().tasks.find((task) => task.id === 'task_new')?.status === 'doing', 'moveTask did not update status')
   const linkedTask = await store.linkSession('task_new', 'session-xyz')
   check(linkedTask && linkedTask.sessionId === 'session-xyz', 'linkSession did not update the task')
-  const archivedTask = await store.archiveTask('task_new')
-  check(archivedTask && archivedTask.archived === true, 'archiveTask did not archive')
-  const restoredTask = await store.restoreTask('task_new')
-  check(restoredTask && restoredTask.archived === false, 'restoreTask did not restore')
+  store.setFocusTask('task_new')
+  render(mainEntry.component, {})
+  const action = (label) => renderedElements.find((node) => node.type === 'button'
+    && node.props.className === 'kbn-btn' && renderNode(node.props.children).endsWith(label))
+  await action('归档任务').props.onClick()
+  const fromStore = () => store.getSnapshot().tasks.find((task) => task.id === 'task_new')
+  check(fromStore()?.archived && fromStore().sessionId === 'session-xyz', 'detail archive must preserve the link')
+  render(test.ArchiveDialog, { open: true, onClose() {} })
+  const row = renderedElements.find((node) => node.props.className === 'kbn-archive-row'
+    && renderNode(node.props.children).includes('新任务'))
+  renderedElements.length = 0
+  renderNode(row)
+  await action('恢复').props.onClick()
+  check(fromStore()?.archived === false && fromStore().sessionId === 'session-xyz', 'restore must preserve the link')
+  check(sessionArchiveCalls.length === 0, 'board archive and restore must leave the session alone')
   await store.deleteTask('task_new')
   check(store.getSnapshot().tasks.every((task) => task.id !== 'task_new'), 'deleteTask left the task behind')
   check(store.attachmentUrl('att_1').includes('kanban.attachment'), 'attachmentUrl is wrong')

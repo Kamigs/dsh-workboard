@@ -52,7 +52,7 @@ registry (`ctx.connection.fetch.register` on the host,
 | `src/client/parts/50-archive-modal.js` | archived-task manager (restore / delete / open session) |
 | `src/client/parts/55-board.js` | `BoardPage`: workspace switch, three columns, drag & drop, detail sheet, resizer |
 | `src/client/parts/58-attachment-preview.js` | attachment classification, thumbnail data, right-hand preview rail |
-| `src/client/parts/60-session-bridge.js` | AI-task session creation, task ↔ session navigation, archive-with-session |
+| `src/client/parts/60-session-bridge.js` | AI-task session creation, task ↔ session navigation |
 | `src/client/parts/90-entry.js` | `apply()`: locale, styles, store, slot registrations |
 
 Build order is fixed in `scripts/build-client.mjs`; later parts may use
@@ -265,8 +265,8 @@ and `.kbn-preview-*`; `59-data-transfer.js` → `.kbn-data-*`, `.kbn-import-*` a
 - `let kanbanStore = null` is declared in `25-store.js` and assigned by
   `90-entry.js` before any slot registers.
 - `60-session-bridge.js` declares hoisted functions the board calls from event
-  handlers: `dispatchTask(task, destination, mode)`, `openTaskSession(task)`,
-  `setTaskArchivedWithSession(task, archived)`.
+  handlers: `dispatchTask(task, destination, mode)` and `openTaskSession(task)`.
+  The board and archive dialog call the task store directly to archive and restore individual cards.
 - `37-account.js` declares the optional account read the editor and card use:
   `loadKbnAccount(ctx)`, `useKbnAccount()`, `kbnAccountMatchesTask()`.
 - `58-attachment-preview.js` declares `kbnAttachmentKind`,

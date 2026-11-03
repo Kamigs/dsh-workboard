@@ -226,49 +226,24 @@ function createKanbanStore(ctx) {
     commit({ tasks })
   }
 
-  /**
-   * Archive one task (optimistic archived flag, host task as truth).
-   * @param {string} id
-   * @returns {Promise<object>} the archived task
-   */
-  async function archiveTask(id) {
+  /** Archive or restore only the specified board task, preserving its session link. */
+  async function setTaskArchived(id, archived) {
     const previous = taskById(snapshot, id)
     if (previous !== null) {
-      replaceTask(Object.assign({}, previous, {
-        archived: true,
-        archivedAt: new Date().toISOString(),
-      }))
+      replaceTask({ ...previous, archived, archivedAt: archived ? new Date().toISOString() : null })
     }
     try {
-      const body = await apiPost(KANBAN_API_PATHS.archive, { id })
-      const task = body !== null ? body.task : null
-      if (task === null || task === undefined) throw new Error(t('api.badResponse'))
-      replaceTask(task)
-      return task
+      const path = archived ? KANBAN_API_PATHS.archive : KANBAN_API_PATHS.restore
+      const body = await apiPost(path, { id })
+      if (body?.task?.id !== id || body.task.archived !== archived) throw new Error(t('api.badResponse'))
+      replaceTask(body.task)
+      return body.task
     } catch (error) {
       if (previous !== null) replaceTask(previous)
-      throw error
-    }
-  }
-
-  /**
-   * Restore one archived task.
-   * @param {string} id
-   * @returns {Promise<object>} the restored task
-   */
-  async function restoreTask(id) {
-    const previous = taskById(snapshot, id)
-    if (previous !== null) {
-      replaceTask(Object.assign({}, previous, { archived: false, archivedAt: null }))
-    }
-    try {
-      const body = await apiPost(KANBAN_API_PATHS.restore, { id })
-      const task = body !== null ? body.task : null
-      if (task === null || task === undefined) throw new Error(t('api.badResponse'))
-      replaceTask(task)
-      return task
-    } catch (error) {
-      if (previous !== null) replaceTask(previous)
+      // A lost response can follow a successful write. Reconcile only with the board.
+      await refresh()
+      const saved = taskById(snapshot, id)
+      if (snapshot.status === 'ready' && saved?.archived === archived) return saved
       throw error
     }
   }
@@ -434,8 +409,8 @@ function createKanbanStore(ctx) {
     createTask,
     updateTask,
     moveTask,
-    archiveTask,
-    restoreTask,
+    archiveTask: (id) => setTaskArchived(id, true),
+    restoreTask: (id) => setTaskArchived(id, false),
     deleteTask,
     linkSession,
     createBoard,

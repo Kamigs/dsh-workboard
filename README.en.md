@@ -7,8 +7,7 @@ A DeepSeek Harness (DSH) plugin that adds a **Task Board** to the left sidebar.
 Every Harness workspace gets its own board with three permanently visible columns
 (To do / Doing / Done). Tasks carry dates, urgency, tags, attachments and an
 assignee (AI or the signed-in account). An AI task can spawn a Harness session
-that executes it. Cards and sessions link to each other, and archiving a
-task archives its session too.
+that executes it. Cards and sessions link to each other.
 
 [中文](README.md) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md)
 
@@ -30,7 +29,7 @@ task archives its session too.
 - **Send an AI task**. Choose a new session, the linked session, or the eligible current session in the same workspace. Discussion keeps the card in its column. Executing a queued task moves it from To do to Doing. Users mark completion on the board.
 - **Linked tasks**. In a linked session, toggle the task list in the header to see board status. Select a task to reveal its card.
 - **Archive** tasks in any column from their details. Restoring a task returns
-  its card to the original column and restores its linked session.
+  its card to the original column with its session link intact.
 - **Import / export**: the "Data" button in the header exports every task as
   JSON and imports a JSON document into the current project (new tasks only —
   attachments, sessions and archived state are not migrated).
