@@ -723,8 +723,7 @@ addStyle(`
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding: 4px 10px;
-  border-inline: .5px solid transparent;
+  padding: 4px 0;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;
   line-height: 20px;
