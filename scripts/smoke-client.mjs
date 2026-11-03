@@ -722,6 +722,7 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check((detail.match(/kbn-attach-thumb-file/g) || []).length === 2, 'non-image attachments need file thumbnails')
   check(detail.includes('/api/kanban.attachment?id=att_2'), 'detail pane image preview URL is wrong')
   check(detail.includes('session-abc'), 'detail pane did not show the linked session')
+  check(detail.includes('>归档任务<'), 'an in-progress task must offer archive in its details')
   check(detail.includes('kbn-card-send') === false, 'detail pane should not render card actions')
   check(detail.includes('kbn-detail-edit'), 'detail pane is missing the corner edit button')
   check(detail.includes('kbn-detail-head-actions'), 'detail header actions group missing')

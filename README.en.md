@@ -7,7 +7,7 @@ A DeepSeek Harness (DSH) plugin that adds a **Task Board** to the left sidebar.
 Every Harness workspace gets its own board with three permanently visible columns
 (To do / Doing / Done). Tasks carry dates, urgency, tags, attachments and an
 assignee (AI or the signed-in account). An AI task can spawn a Harness session
-that executes it; cards and sessions navigate to each other, and archiving a Done
+that executes it. Cards and sessions link to each other, and archiving a
 task archives its session too.
 
 [中文](README.md) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md)
@@ -29,8 +29,8 @@ task archives its session too.
   video / audio / text / other files open in a right-hand preview rail.
 - **Send an AI task**. Choose a new session, the linked session, or the eligible current session in the same workspace. Discussion keeps the card in its column. Executing a queued task moves it from To do to Doing. Users mark completion on the board.
 - **Linked tasks**. In a linked session, toggle the task list in the header to see board status. Select a task to reveal its card.
-- **Archive**: a Done task archives together with its session; the archive dialog
-  restores (and unarchives the session) or deletes entries.
+- **Archive** tasks in any column from their details. Restoring a task returns
+  its card to the original column and restores its linked session.
 - **Import / export**: the "Data" button in the header exports every task as
   JSON and imports a JSON document into the current project (new tasks only —
   attachments, sessions and archived state are not migrated).
@@ -92,8 +92,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
    bottom right; choose the destination and send mode there.
 5. Click a card to read its details on the right; images preview inline, other
    attachments open in the right preview rail.
-6. Archive a Done task from the card; the archive button in the header opens the
-   archive dialog for restoring or deleting entries.
+6. Choose **Archive task** in the details. Open the archive in the board header to restore or delete a task.
 7. The header's "Data" button exports the board as JSON or imports a JSON export
    into the current project.
 

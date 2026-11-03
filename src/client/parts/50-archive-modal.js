@@ -6,7 +6,7 @@ addDict(
   {
     'archive.title': '归档任务',
     'archive.emptyTitle': '暂无归档任务',
-    'archive.emptyDesc': '在「已完成」列归档的任务会出现在这里，随时可以恢复。',
+    'archive.emptyDesc': '归档的任务会出现在这里，恢复后会回到原来的状态列。',
     'archive.restore': '恢复',
     'archive.confirmDelete': '确认删除',
     'archive.restored': '任务已恢复',
@@ -18,7 +18,7 @@ addDict(
   {
     'archive.title': 'Archived tasks',
     'archive.emptyTitle': 'No archived tasks',
-    'archive.emptyDesc': 'Tasks you archive from the Done column land here and can be restored any time.',
+    'archive.emptyDesc': 'Archived tasks appear here. Restore a task to return it to its original column.',
     'archive.restore': 'Restore',
     'archive.confirmDelete': 'Confirm delete',
     'archive.restored': 'Task restored',

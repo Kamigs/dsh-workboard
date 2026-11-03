@@ -40,7 +40,6 @@ addDict(
     'detail.aiHint': 'AI 任务可以发送到会话，执行后会话会关联回这张卡片。',
     'detail.edit': '编辑',
     'detail.run': '发送到会话',
-    'detail.archive': '归档',
     'detail.delete': '删除',
     'detail.deleteConfirm': '再点一次删除',
     'board.untitled': '未命名看板',
@@ -89,7 +88,6 @@ addDict(
     'detail.aiHint': 'AI tasks can run in a session; the session links back to this card.',
     'detail.edit': 'Edit',
     'detail.run': 'Send to session',
-    'detail.archive': 'Archive',
     'detail.delete': 'Delete',
     'detail.deleteConfirm': 'Click again to delete',
     'board.untitled': 'Untitled board',
@@ -316,16 +314,14 @@ function TaskDetailPanel({
       onClick: () => onOpenSession(task),
     }, t('action.openSession')))
   }
-  if (status === 'done') {
-    actions.push(h(Button, {
-      key: 'archive',
-      size: 'sm',
-      variant: 'ghost',
-      icon: h(Icon, { name: 'archive', size: 12 }),
-      disabled: busy,
-      onClick: () => onArchive(task),
-    }, t('detail.archive')))
-  }
+  actions.push(h(Button, {
+    key: 'archive',
+    size: 'sm',
+    variant: 'ghost',
+    icon: h(Icon, { name: 'archive', size: 12 }),
+    disabled: busy,
+    onClick: () => onArchive(task),
+  }, t('card.archive')))
   actions.push(h(Button, {
     key: 'delete',
     size: 'sm',
