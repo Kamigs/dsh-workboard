@@ -250,6 +250,13 @@ node scripts/smoke-client.mjs        # render every surface without a browser
 `lib/client.js` is committed because it is the plugin's browser runtime; CI
 rebuilds it and fails if the committed artifact differs from the sources.
 
+`npm run pack` runs those checks via `prepack`, creates a tarball in `dist/`,
+then installs it offline without lifecycle scripts into a temporary consumer.
+The verifier and both smoke scripts accept that installed package root, so the
+release check detects missing runtime files instead of accidentally importing
+from the checkout. Sources, tests and check scripts are excluded by the
+`package.json.files` allowlist. See [Packaging and release](RELEASING.md).
+
 ## 10. Class ownership
 
 Base part (`10-style-base.js`):

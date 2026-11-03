@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, toGPT]
   pull_request:
 
 permissions:
@@ -23,20 +23,15 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
-      - name: Build the browser bundle
-        run: node scripts/build-client.mjs
+      - name: Build, test, pack and validate an isolated installation
+        run: npm run pack
 
       - name: The committed bundle matches the sources
         run: git diff --exit-code lib/client.js
 
-      - name: Static checks (manifest, exports, locales, guards)
-        run: node scripts/verify.mjs
-
-      - name: Host store unit tests
-        run: node --test
-
-      - name: Host route smoke test
-        run: node scripts/smoke-host-routes.mjs
-
-      - name: Browser half render smoke test
-        run: node scripts/smoke-client.mjs
+      - name: Upload installable bundle
+        if: matrix.node == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-workboard-package
+          path: dist/

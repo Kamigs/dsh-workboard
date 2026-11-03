@@ -35,7 +35,7 @@ addDict(
   },
 )
 
-/** Priority → chip tone (ARCHITECTURE.md §7: low idle, medium business, high warn, urgent error). */
+/** Priority → chip tone (docs/ARCHITECTURE.md §7: low idle, medium business, high warn, urgent error). */
 const KBN_PRIORITY_TONES = {
   low: 'neutral',
   medium: 'brand',

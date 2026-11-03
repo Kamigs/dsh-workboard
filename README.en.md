@@ -9,7 +9,7 @@ Every Harness workspace gets its own board with three permanently visible column
 assignee (AI or the signed-in account). AI tasks can be sent to Harness sessions
 for discussion or execution. Cards and sessions link to each other.
 
-[中文](README.md) · [Architecture](ARCHITECTURE.md) · [Changelog](CHANGELOG.md)
+[中文](README.md) · [Architecture](docs/ARCHITECTURE.md) · [Changelog](CHANGELOG.md) · [Packaging and release](docs/RELEASING.md)
 
 ## Features
 
@@ -46,46 +46,57 @@ for discussion or execution. Cards and sessions link to each other.
 
 ## Requirements
 
-- DeepSeek Harness `0.2.1-rc.5` (Desktop/Web profile) tested. Older/newer
-  versions that lack the `sidebar.panellist` / `main` slots or the
-  `connection.fetch` service simply leave the plugin inactive.
-- No build tooling is needed to run it; development needs Node.js >= 22.
+- Tested with DeepSeek Harness `0.2.1-rc.5` in Desktop and Web profiles.
+- `engines.dsh` declares `>=0.2.1-rc.5 <0.3.0`. This is a compatibility policy,
+  not a claim that every version in that range has been tested. Recheck the UI
+  after upgrading DSH; prereleases with other version tuples are not included.
+- Node.js >= 22. No npm runtime dependencies: React and DSH UI primitives come
+  from the host's browser module table.
 
 ## Install
 
-The browser bundle `lib/client.js` is committed, so installation runs no build
-scripts.
+This is a DSH **bundle plugin**: `package.json` and `cordis.patch.yml` declare
+its entry. The prebuilt `lib/client.js` is committed. These commands use an
+installed `dsh` CLI; use the `desktop` profile for Desktop or `web` for Web.
 
-### From GitHub (recommended)
+### From a local tarball
 
-```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add github:Kamigs/dsh-workboard
-```
-
-Restart the profile afterwards; the board icon appears in the left sidebar.
-
-### From a local checkout (development)
+Run `npm run pack` in the development checkout to build, check and package it:
 
 ```sh
-git clone https://github.com/Kamigs/dsh-workboard.git
-cd dsh-workboard
-npm run build          # regenerate lib/client.js (optional)
+dsh plugin --profile desktop add ./dist/dsh-workboard-0.1.0.tgz
 ```
 
-Then install the absolute directory path from the Harness plugin manager:
+Restart that DSH instance. Web users should replace `desktop` with `web`.
 
-```
-plugin_manager action=install_bundle target=/absolute/path/to/dsh-workboard
-```
+### From a local checkout
 
-A local directory is linked, so `npm run build` plus a page refresh is enough to
-pick up changes.
-
-### From npm (if published)
+Run from the plugin root:
 
 ```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
+npm run build
+dsh plugin --profile desktop add .
 ```
+
+The directory is linked. Rebuild and refresh after browser changes; reload the
+plugin or restart the instance after Host or manifest changes.
+
+### After public release
+
+Publishing the GitHub repository and npm package are separate steps. Use these
+commands once the corresponding source/version is public:
+
+```sh
+# The GitHub checkout must contain the built lib/client.js.
+dsh plugin --profile desktop add github:Kamigs/dsh-workboard
+
+# Only after this version is published to npm.
+dsh plugin --profile desktop add dsh-workboard@0.1.0
+```
+
+The package ships prebuilt entries and has no `prepare`, `install` or
+`postinstall` hook. Pin a verified commit or tag for repeatable GitHub installs.
+See [Packaging and release](docs/RELEASING.md) for the maintainer workflow.
 
 ## Usage
 
@@ -134,9 +145,10 @@ npm run build       # concat src/client/parts -> lib/client.js
 npm test            # storage, archival and session dispatch tests
 npm run test:smoke  # host routes end-to-end + browser-half render smoke (no browser)
 npm run check       # everything above plus static checks
+npm run pack        # build, check, pack and test an isolated installation
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [ARCHITECTURE.md](ARCHITECTURE.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Layout
 
@@ -150,7 +162,13 @@ scripts/                  build, static verification, host-route and render smok
 test/                     storage, archival and session dispatch tests
 locale/                   plugin display metadata (en/zh)
 icon.svg, cordis.patch.yml
+docs/                     Architecture and release instructions
+dist/                     Verified tarball and SHA-256 (generated, gitignored)
 ```
+
+The checkout contains sources and tests. The installable package contains only
+runtime files, icons, locales and documentation. `host/` is executable plain
+JavaScript; `lib/` contains the committed browser build output.
 
 ## Notes
 

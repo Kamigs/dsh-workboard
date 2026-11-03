@@ -5,7 +5,7 @@
  * Geometry, colors and states are copied from the running Harness
  * (`dsh-client-ui-primitives` CSS and the official panel styles) and are
  * expressed only through `--dsw-*` tokens so light/dark both work.
- * Board-owned selectors (ARCHITECTURE.md §10 "Board part") are intentionally absent.
+ * Board-owned selectors (docs/ARCHITECTURE.md §10 "Board part") are intentionally absent.
  */
 addStyle(`
 /* ---------------------------------------------------------------- page shell */

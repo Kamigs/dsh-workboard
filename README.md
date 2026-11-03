@@ -7,7 +7,7 @@
 三栏（待办 / 进行中 / 已完成）常驻；任务带日期、紧急程度、标签、附件、指派（AI 或当前登录账号）。
 AI 任务可以发到会话里讨论或执行，卡片与会话互相跳转。
 
-[English](README.en.md) · [架构说明](ARCHITECTURE.md) · [更新日志](CHANGELOG.md)
+[English](README.en.md) · [架构说明](docs/ARCHITECTURE.md) · [更新日志](CHANGELOG.md) · [打包发布](docs/RELEASING.md)
 
 ## 功能
 
@@ -28,43 +28,53 @@ AI 任务可以发到会话里讨论或执行，卡片与会话互相跳转。
 
 ## 环境要求
 
-- DeepSeek Harness `0.2.1-rc.5`（Desktop / Web profile）已实测；更早或更新的版本如缺少
-  `sidebar.panellist` / `main` slot 或 `connection.fetch` 服务，插件会保持未激活。
-- 运行不需要构建工具；只有开发时需要 Node.js >= 22。
+- 已实测 DeepSeek Harness `0.2.1-rc.5` 的 Desktop / Web profile。
+- `engines.dsh` 声明范围为 `>=0.2.1-rc.5 <0.3.0`；这不是对范围内所有版本的实测保证。
+  DSH 的客户端 API 仍在迭代，升级后需重新验收。该范围不包含其他版本号的预发布版。
+- Node.js >= 22。插件无 npm 运行依赖；React 和 DSH UI 组件由宿主客户端模块表提供。
 
 ## 安装
 
-浏览器产物 `lib/client.js` 已随仓库提交，安装时不需要执行任何构建脚本。
+本项目是 DSH **Bundle 插件**，根目录的 `package.json` 与 `cordis.patch.yml`
+一起声明加载方式。浏览器产物 `lib/client.js` 已提交，用户安装预构建包无需编译。
+以下命令使用已安装的 `dsh` CLI；Desktop 使用 `desktop` profile，Web 使用 `web`。
 
-### 方式一：从 GitHub 安装（推荐）
+### 从本地安装包安装
 
-```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add github:Kamigs/dsh-workboard
-```
-
-安装完成后重启该 profile；左侧栏会出现看板图标。
-
-### 方式二：本地目录（开发调试）
+先在开发目录执行 `npm run pack`，它会构建、检查并生成安装包，然后执行：
 
 ```sh
-git clone https://github.com/Kamigs/dsh-workboard.git
-cd dsh-workboard
-npm run build          # 重新生成 lib/client.js（可选）
+dsh plugin --profile desktop add ./dist/dsh-workboard-0.1.0.tgz
 ```
 
-然后在 Harness 里用插件管理器安装这个目录的绝对路径：
+重启对应的 DSH 实例后，左侧栏会出现「工作看板」。Web 用户将 `desktop` 改为 `web`。
 
-```
-plugin_manager action=install_bundle target=/absolute/path/to/dsh-workboard
-```
+### 从本地目录开发
 
-本地目录以链接方式安装，改完源码执行 `npm run build` 后刷新页面即可。
-
-### 方式三：npm（若已发布到 npm）
+在插件根目录执行：
 
 ```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile <profile> add dsh-workboard
+npm run build
+dsh plugin --profile desktop add .
 ```
+
+本地目录以链接方式安装。修改浏览器源码后运行 `npm run build` 并刷新页面；
+修改 Host 代码或 manifest 后重新加载插件或重启对应实例。
+
+### 公开发布后的安装方式
+
+GitHub 仓库和 npm 包的公开发布需单独完成；下面的命令用于发布之后：
+
+```sh
+# GitHub：仓库必须包含已构建的 lib/client.js
+dsh plugin --profile desktop add github:Kamigs/dsh-workboard
+
+# npm：仅在对应版本已发布后可用
+dsh plugin --profile desktop add dsh-workboard@0.1.0
+```
+
+发布包包含预构建入口，不声明 `prepare`、`install` 或 `postinstall`。
+生产使用可把 GitHub 来源固定到已验证的提交或标签。发布步骤见[打包发布](docs/RELEASING.md)。
 
 ## 使用
 
@@ -103,9 +113,10 @@ npm run build     # 拼接 src/client/parts -> lib/client.js
 npm test          # 存储、任务归档、发送流程测试
 npm run test:smoke  # Host 路由端到端 + 浏览器半渲染冒烟（无需浏览器）
 npm run check     # 以上全部 + 静态校验
+npm run pack      # 全部检查 + 打包 + 隔离安装包冒烟，输出 dist/
 ```
 
-详见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [ARCHITECTURE.md](ARCHITECTURE.md)。
+详见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## 项目结构
 
@@ -115,11 +126,16 @@ host/store.js             任务模型、校验、原子持久化、附件
 host/routes.js            /api/kanban.* 认证 JSON 接口
 lib/client.js             构建产物：浏览器包（提交在仓库里）
 src/client/parts/*.js     浏览器源码分段，按序拼进同一个 factory 作用域
-scripts/                  构建、静态校验、Host 路由冒烟、浏览器半渲染冒烟
+scripts/                  构建、静态校验、冒烟检查和安装包验证
 test/                     存储、归档、发送流程测试
 locale/                   插件面板展示用的中英文元数据
 icon.svg, cordis.patch.yml
+docs/                     架构说明与打包发布步骤
+dist/                     已验证的 .tgz 与 SHA-256（生成目录，不提交 Git）
 ```
+
+开发目录保留源码与测试；安装包只带运行文件、图标、本地化和文档。
+`host/` 是无需编译的 JavaScript 运行源码，`lib/` 是提交到 Git 的浏览器构建产物。
 
 ## 说明
 

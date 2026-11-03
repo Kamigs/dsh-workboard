@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
+
+# Local release artifacts (created by npm run pack)
+dist/
+*.tgz
 
 # OS / editor noise
 .DS_Store
@@ -9,11 +12,16 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+.env
+.env.*
 
 # Test and coverage output
 coverage/
 .nyc_output/
 *.tap
+test-results/
+playwright-report/
+.playwright-cli/
 
 # Local data (never part of the plugin)
 .dsh/

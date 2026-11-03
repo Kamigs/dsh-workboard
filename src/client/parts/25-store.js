@@ -15,7 +15,7 @@
 /** @type {ReturnType<typeof createKanbanStore> | null} */
 let kanbanStore = null
 
-/** Host route table (ARCHITECTURE.md §3). */
+/** Host route table (docs/ARCHITECTURE.md §3). */
 const KANBAN_API_PATHS = {
   state: '/api/kanban.state',
   boardCreate: '/api/kanban.board.create',
@@ -32,7 +32,7 @@ const KANBAN_API_PATHS = {
   attachment: '/api/kanban.attachment',
 }
 
-/** Toast auto-dismiss delay (ARCHITECTURE.md §5). */
+/** Toast auto-dismiss delay (docs/ARCHITECTURE.md §5). */
 const KANBAN_TOAST_MS = 4000
 
 /** Empty snapshot used before the first load. */

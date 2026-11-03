@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Verified release packaging with a prepack build/check gate, offline tarball
+  installation smoke tests, SHA-256 output and CI package artifacts.
+- Explicit DSH compatibility range and localized plugin detail documents.
+
 - Send-task dialog with new, eligible current, or linked session destinations
   and discussion/execution modes; task attachments travel with the brief.
 - Toggleable conversation task panel with per-task status, board navigation,
@@ -19,6 +23,9 @@ All notable changes to this project are documented here. The format follows
 - Attachment drag and drop without an attachment-count limit.
 
 ### Changed
+
+- Architecture and release documentation live under `docs/`; npm packages
+  exclude development sources, scripts and tests through an explicit file list.
 
 - One task-content editor replaces separate title and description inputs;
   task details place the body immediately below the name.

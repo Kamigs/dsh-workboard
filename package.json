@@ -16,19 +16,18 @@
   },
   "files": [
     "index.js",
-    "host",
+    "host/routes.js",
+    "host/store.js",
     "lib/client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
     "README.md",
     "README.en.md",
-    "ARCHITECTURE.md",
+    "docs/*.md",
     "CONTRIBUTING.md",
     "CHANGELOG.md",
-    "LICENSE",
-    "src",
-    "scripts"
+    "LICENSE"
   ],
   "keywords": [
     "deepseek-harness",
@@ -49,13 +48,16 @@
     "url": "https://github.com/Kamigs/dsh-workboard/issues"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "dsh": ">=0.2.1-rc.5 <0.3.0"
   },
   "scripts": {
     "build": "node scripts/build-client.mjs",
     "test": "node --test",
     "test:smoke": "node scripts/smoke-host-routes.mjs && node scripts/smoke-client.mjs",
     "verify": "node scripts/verify.mjs",
+    "prepack": "npm run check",
+    "pack": "node scripts/pack.mjs",
     "check": "node scripts/build-client.mjs && node scripts/verify.mjs && node --test && node scripts/smoke-host-routes.mjs && node scripts/smoke-client.mjs"
   },
   "dsh": {

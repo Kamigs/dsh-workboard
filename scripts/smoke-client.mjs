@@ -10,11 +10,11 @@
  * installing into the live Harness.
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const root = process.argv[2] ? resolve(process.argv[2]) : join(dirname(fileURLToPath(import.meta.url)), '..')
 const bundlePath = join(root, 'lib/client.js')
 if (!existsSync(bundlePath)) {
   console.error('smoke: lib/client.js missing, run node scripts/build-client.mjs first')

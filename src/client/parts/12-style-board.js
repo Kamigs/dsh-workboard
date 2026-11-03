@@ -1,9 +1,9 @@
 /**
  * Board stylesheet: workspace bar, columns, cards, drop indicators, editor
  * form bits, archive rows and the project-creation dialog. Owns every
- * `kbn-` selector that `10-style-base.js` does not (ARCHITECTURE.md §10).
+ * `kbn-` selector that `10-style-base.js` does not (docs/ARCHITECTURE.md §10).
  *
- * Values follow the running Harness scale (ARCHITECTURE.md §7): radius-lg cards on
+ * Values follow the running Harness scale (docs/ARCHITECTURE.md §7): radius-lg cards on
  * a module-platform column, 8px status dots, 36px controls, token colors only.
  */
 addStyle(`
@@ -284,7 +284,7 @@ addStyle(`
   min-width: 0;
 }
 
-/* Urgency chip: text always written, tone from the status scale (ARCHITECTURE.md §7). */
+/* Urgency chip: text always written, tone from the status scale (docs/ARCHITECTURE.md §7). */
 .kbn-priority {
   flex: none;
   height: 22px;

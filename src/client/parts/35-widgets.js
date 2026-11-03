@@ -1,7 +1,7 @@
 /**
  * Generic widgets shared by the board, editor and archive parts.
  *
- * Props are exactly those documented in ARCHITECTURE.md §5; every class is
+ * Props are exactly those documented in docs/ARCHITECTURE.md §5; every class is
  * `kbn-` prefixed and styled by `10-style-base.js`. All visible copy goes
  * through `t()` and the widget keys below are namespaced so they cannot
  * collide with `05-l10n.js`.

@@ -1,10 +1,11 @@
 /** Static checks that need no running Harness: bundle wrapper, exports, syntax. */
 import { readFileSync, existsSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import vm from 'node:vm'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+// An installed package can be checked without access to the source checkout.
+const root = process.argv[2] ? resolve(process.argv[2]) : join(dirname(fileURLToPath(import.meta.url)), '..')
 const fail = (message) => { console.error('FAIL ' + message); process.exitCode = 1 }
 
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
@@ -21,6 +22,14 @@ for (const [key, target] of Object.entries(manifest.exports)) {
 }
 if (manifest.dsh?.client?.platform !== 'web') fail('dsh.client.platform must be web')
 if (!manifest.dsh?.bundle?.patch) fail('dsh.bundle.patch missing')
+if (manifest.dsh?.profile) fail('a plugin bundle must not declare dsh.profile')
+if (!manifest.engines?.dsh) fail('engines.dsh compatibility range missing')
+const patchPath = manifest.dsh?.bundle?.patch
+if (typeof patchPath !== 'string' || !existsSync(join(root, patchPath))) {
+  fail('bundle patch file missing')
+} else if (!readFileSync(join(root, patchPath), 'utf8').includes('name: ' + manifest.name)) {
+  fail('bundle patch must load the plugin by its package name')
+}
 
 const clientPath = join(root, manifest.exports['./client'])
 if (existsSync(clientPath)) {
@@ -53,7 +62,7 @@ if (existsSync(clientPath)) {
 }
 
 // Host half must be importable and expose the function-plugin shape.
-const host = await import(join(root, manifest.main))
+const host = await import(pathToFileURL(join(root, manifest.main)).href)
 if (typeof host.apply !== 'function') fail('host half has no apply()')
 if (!Array.isArray(host.inject)) fail('host half has no inject array')
 if (host.Config !== undefined && typeof host.Config !== 'function' && typeof host.Config !== 'object') {
@@ -64,6 +73,9 @@ if (typeof host.name !== 'string' || host.name === '') fail('host half has no na
 for (const locale of ['en', 'zh']) {
   const dict = JSON.parse(readFileSync(join(root, 'locale', locale + '.json'), 'utf8'))
   if (!dict?.meta?.title || !dict?.meta?.description) fail(`locale/${locale}.json lacks meta.title/description`)
+  if (!dict?.meta?.detail || !existsSync(join(root, dict.meta.detail))) {
+    fail(`locale/${locale}.json must reference a shipped detail document`)
+  }
 }
 if (!existsSync(join(root, 'icon.svg'))) fail('icon.svg missing')
 for (const required of ['index.js', 'host/store.js', 'host/routes.js', 'lib/client.js', 'cordis.patch.yml', 'LICENSE', 'README.md']) {
@@ -73,7 +85,7 @@ if (manifest.license !== 'MIT') fail('package.json license must be MIT')
 if (typeof manifest.repository?.url !== 'string' || !manifest.repository.url.includes('github')) {
   fail('package.json repository.url must point at the GitHub repo')
 }
-for (const included of ['lib/client.js', 'host', 'locale/*.json', 'icon.svg', 'cordis.patch.yml']) {
+for (const included of ['lib/client.js', 'host/routes.js', 'host/store.js', 'locale/*.json', 'icon.svg', 'cordis.patch.yml']) {
   if (!Array.isArray(manifest.files) || !manifest.files.includes(included)) {
     fail(`package.json files is missing ${included}`)
   }

@@ -8,8 +8,11 @@
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { createStore } from '../host/store.js'
-import { registerKanbanRoutes } from '../host/routes.js'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const root = process.argv[2] ? path.resolve(process.argv[2]) : fileURLToPath(new URL('..', import.meta.url))
+const { createStore } = await import(pathToFileURL(path.join(root, 'host/store.js')).href)
+const { registerKanbanRoutes } = await import(pathToFileURL(path.join(root, 'host/routes.js')).href)
 
 const dataDir = await mkdtemp(path.join(tmpdir(), 'kanban-routes-'))
 const workspaceRoot = await mkdtemp(path.join(tmpdir(), 'kanban-workspaces-'))
