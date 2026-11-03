@@ -30,13 +30,15 @@ addStyle(`
 
 /* ------------------------------------------------------------------ header */
 
-.kbn-head{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px 16px;flex:none;padding:18px var(--kbn-page-gutter) 10px}
+.kbn-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px 16px;flex:none;padding:18px var(--kbn-page-gutter) 10px}
+
+.kbn-head-back{grid-column:1 / -1;justify-self:start}
 
 .kbn-head-main{display:flex;flex-direction:column;gap:2px;flex:1 1 140px;min-width:0}
 
 .kbn-subtitle{margin:0;font-size:13px;line-height:20px;font-weight:400;color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}
 
-.kbn-head-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:100%;margin-inline-start:auto}
+.kbn-head-actions{display:flex;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:100%;margin-inline-start:auto}
 
 .kbn-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:none;padding:0 24px 12px}
 

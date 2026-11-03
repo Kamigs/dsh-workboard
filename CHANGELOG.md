@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Workboard home with searchable cards for every workspace and standalone
+  board, status counts, an adaptive completion heatmap and shared idea notes.
+- Durable completion events, grouped by local calendar date and deduplicated
+  per task/day in the heatmap. Recording begins with the feature; legacy Done
+  tasks are not backfilled, and archiving or deleting tasks preserves history.
+- Six-color notes with quick entry, search, inline editing, footer timestamps,
+  deletion confirmation and 600ms autosave for edits. Pending and failed edits
+  survive navigation; localStorage restores drafts after reload for retry.
+- Host and client coverage for note persistence, save failures, draft recovery,
+  completion history and local-date heatmap counts, plus home/route smoke checks.
 - Verified release packaging with a prepack build/check gate, offline tarball
   installation smoke tests, SHA-256 output and CI package artifacts.
 - Explicit DSH compatibility range and localized plugin detail documents.
@@ -18,12 +28,20 @@ All notable changes to this project are documented here. The format follows
   editing and task creation.
 - Native DSH Workboard settings with inline board renaming, board creation,
   per-board archive previews and data import/export.
-- Persistent board selection and standalone boards that bind a working
+- Standalone boards that bind a working
   directory when first used for an AI session.
 - Attachment drag and drop without an attachment-count limit.
 
 ### Changed
 
+- The sidebar, reload and restart now open home. Board cards enter the existing
+  three-column detail view, and **Back** returns home; conversation task
+  links still open their target board and task directly.
+- Home controls use DSH UI primitives directly, and icon aliases resolve to
+  host exports instead of copied SVG paths. Note accents blend with host theme
+  tokens for light/dark surfaces; settings navigation keeps the host icon.
+- Task JSON import/export remains task-only: notes and completion history are
+  excluded. Imported Done tasks record new completions on the import date.
 - Architecture and release documentation live under `docs/`; npm packages
   exclude development sources, scripts and tests through an explicit file list.
 
@@ -38,6 +56,14 @@ All notable changes to this project are documented here. The format follows
   controls. Each board's three most recent archived tasks remain visible.
 
 ### Fixed
+
+- The detail header places **Back** above the board title and status summary;
+  settings and new-board actions align with the summary's bottom edge.
+- Home responsiveness: the heatmap always shows the latest 52 weeks and scales
+  square cells and gaps to the panel width. Ultrawide panels center the chart
+  with equal side margins and a maximum 24px cell size;
+  wide panels place boards and idea notes side by side, with each card grid
+  adapting independently.
 
 - Board notifications appear at the top centre instead of covering task-detail
   actions in the bottom-right corner.

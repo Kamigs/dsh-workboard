@@ -30,6 +30,9 @@ const KANBAN_API_PATHS = {
   link: '/api/kanban.task.link',
   upload: '/api/kanban.attachment.upload',
   attachment: '/api/kanban.attachment',
+  noteCreate: '/api/kanban.note.create',
+  noteUpdate: '/api/kanban.note.update',
+  noteDelete: '/api/kanban.note.delete',
 }
 
 /** Toast auto-dismiss delay (docs/ARCHITECTURE.md §5). */
@@ -42,6 +45,12 @@ function kanbanEmptySnapshot() {
     workspaces: [],
     boards: [],
     tasks: [],
+    notes: [],
+    completions: [],
+    boardId: null,
+    noteDraft: { content: '', color: 'yellow' },
+    noteEdits: {},
+    noteStatus: {},
     error: null,
     toast: null,
     revision: 0,
@@ -78,12 +87,26 @@ function kanbanReadFileBase64(file) {
  */
 function createKanbanStore(ctx) {
   let snapshot = kanbanEmptySnapshot()
+  const draftKey = 'dsh-workboard:note-drafts'
+  try {
+    const cached = JSON.parse(localStorage.getItem(draftKey) || 'null')
+    const valid = (draft) => draft && typeof draft.content === 'string' && draft.content.length <= 4000
+      && ['yellow', 'pink', 'blue', 'mint', 'purple', 'neutral'].includes(draft.color)
+    if (valid(cached?.noteDraft)) snapshot.noteDraft = cached.noteDraft
+    for (const [id, draft] of Object.entries(cached?.noteEdits || {})) {
+      if (!valid(draft)) continue
+      snapshot.noteEdits[id] = draft
+      snapshot.noteStatus[id] = 'error'
+    }
+  } catch { /* Storage may be unavailable; in-memory drafts still work. */ }
   let listeners = new Set()
   let disposed = false
   let toastTimer = null
   let toastSeq = 0
   let refreshToken = 0
   let focusTaskId = null
+  const noteTimers = new Map()
+  const noteWrites = new Map()
 
   function getSnapshot() {
     return snapshot
@@ -113,6 +136,11 @@ function createKanbanStore(ctx) {
   /** Replace the snapshot with the previous object plus `patch`, then notify. */
   function setSnapshot(patch) {
     snapshot = Object.assign({}, snapshot, patch)
+    if ('noteDraft' in patch || 'noteEdits' in patch) {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ noteDraft: snapshot.noteDraft, noteEdits: snapshot.noteEdits }))
+      } catch { /* Keep the current draft even when storage is full. */ }
+    }
     emit()
   }
 
@@ -164,9 +192,15 @@ function createKanbanStore(ctx) {
         workspaces: body !== null && Array.isArray(body.workspaces) ? body.workspaces : [],
         boards: body !== null && Array.isArray(body.boards) ? body.boards : [],
         tasks: body !== null && Array.isArray(body.tasks) ? body.tasks : [],
+        notes: Array.isArray(body?.notes) ? body.notes : [],
+        completions: Array.isArray(body?.completions) ? body.completions : [],
         error: null,
         revision: snapshot.revision + 1,
       })
+      if (focusTaskId) {
+        const task = taskById(snapshot, focusTaskId)
+        if (task && !task.archived) setSnapshot({ boardId: task.workspaceId })
+      }
     } catch (error) {
       if (token !== refreshToken) return
       setSnapshot({ status: 'error', error: messageOf(error) })
@@ -186,6 +220,7 @@ function createKanbanStore(ctx) {
       throw new Error(t('api.badResponse'))
     }
     replaceTask(task)
+    if (Array.isArray(body.completions)) commit({ completions: body.completions })
     return task
   }
 
@@ -203,6 +238,7 @@ function createKanbanStore(ctx) {
       const task = body !== null ? body.task : null
       if (task === null || task === undefined) throw new Error(t('api.badResponse'))
       replaceTask(task)
+      if (Array.isArray(body.completions)) commit({ completions: body.completions })
       return task
     } catch (error) {
       if (previous !== null) replaceTask(previous)
@@ -224,7 +260,7 @@ function createKanbanStore(ctx) {
     const body = await apiPost(KANBAN_API_PATHS.move, payload)
     const tasks = body !== null && Array.isArray(body.tasks) ? body.tasks : null
     if (tasks === null) throw new Error(t('api.badResponse'))
-    commit({ tasks })
+    commit({ tasks, completions: body.completions || snapshot.completions })
   }
 
   /** Archive or restore only the specified board task, preserving its session link. */
@@ -318,6 +354,7 @@ function createKanbanStore(ctx) {
     await apiPost(KANBAN_API_PATHS.boardBind, { boardId, workspaceId })
     // Migrate the selected identity before refreshing away the standalone board.
     if (kbnLastWorkspaceId === boardId) kbnRememberBoard(workspaceId)
+    if (snapshot.boardId === boardId) setSnapshot({ boardId: workspaceId })
     await refresh()
   }
 
@@ -348,7 +385,90 @@ function createKanbanStore(ctx) {
   function setFocusTask(taskId) {
     if (typeof taskId !== 'string' || taskId === '') return
     focusTaskId = taskId
-    commit({})
+    const task = taskById(snapshot, taskId)
+    commit({ boardId: task?.workspaceId || null })
+    if (!task) refresh()
+  }
+
+  function openBoard(boardId) {
+    focusTaskId = null
+    kbnRememberBoard(boardId)
+    setSnapshot({ boardId })
+  }
+
+  function openHome() {
+    focusTaskId = null
+    setSnapshot({ boardId: null })
+  }
+
+  function setNoteDraft(patch) {
+    setSnapshot({ noteDraft: { ...snapshot.noteDraft, ...patch } })
+  }
+
+  async function createNote(input) {
+    const { note } = await apiPost(KANBAN_API_PATHS.noteCreate, { input })
+    if (!note?.id) throw new Error(t('api.badResponse'))
+    commit({ notes: [...snapshot.notes, note] })
+    return note
+  }
+
+  function setNoteStatus(id, status) {
+    setSnapshot({ noteStatus: { ...snapshot.noteStatus, [id]: status } })
+  }
+
+  // Drafts and writes outlive the home component, so navigation cannot discard
+  // a pending edit. Each note's requests are serialized; older responses never
+  // replace newer typing. An error retains the draft for explicit retry.
+  function editNote(id, patch) {
+    const current = snapshot.noteEdits[id] || snapshot.notes.find((note) => note.id === id)
+    if (!current) return
+    setSnapshot({ noteEdits: { ...snapshot.noteEdits, [id]: { content: current.content, color: current.color, ...patch } } })
+    setNoteStatus(id, 'pending')
+    clearTimeout(noteTimers.get(id))
+    noteTimers.set(id, setTimeout(() => flushNote(id).catch(() => undefined), 600))
+  }
+
+  function flushNote(id) {
+    clearTimeout(noteTimers.get(id))
+    noteTimers.delete(id)
+    const pending = noteWrites.get(id) || Promise.resolve()
+    const write = pending.catch(() => undefined).then(async () => {
+      const input = snapshot.noteEdits[id]
+      if (!input) return
+      if (!input.content.trim()) {
+        setNoteStatus(id, 'empty')
+        return
+      }
+      setNoteStatus(id, 'saving')
+      try {
+        const { note } = await apiPost(KANBAN_API_PATHS.noteUpdate, { id, input })
+        if (note?.id !== id) throw new Error(t('api.badResponse'))
+        const edits = { ...snapshot.noteEdits }
+        const current = edits[id]
+        const unchanged = current?.content === input.content && current?.color === input.color
+        if (unchanged) delete edits[id]
+        commit({ notes: snapshot.notes.map((entry) => entry.id === id ? note : entry), noteEdits: edits })
+        setNoteStatus(id, unchanged ? 'saved' : 'pending')
+      } catch (error) {
+        setNoteStatus(id, 'error')
+        throw error
+      }
+    })
+    noteWrites.set(id, write)
+    write.finally(() => { if (noteWrites.get(id) === write) noteWrites.delete(id) }).catch(() => undefined)
+    return write
+  }
+
+  async function deleteNote(id) {
+    clearTimeout(noteTimers.get(id))
+    noteTimers.delete(id)
+    await (noteWrites.get(id) || Promise.resolve()).catch(() => undefined)
+    await apiPost(KANBAN_API_PATHS.noteDelete, { id })
+    const edits = { ...snapshot.noteEdits }
+    const statuses = { ...snapshot.noteStatus }
+    delete edits[id]
+    delete statuses[id]
+    commit({ notes: snapshot.notes.filter((note) => note.id !== id), noteEdits: edits, noteStatus: statuses })
   }
 
   /** Consume a pending reveal request. @returns {string | null} */
@@ -390,6 +510,9 @@ function createKanbanStore(ctx) {
 
   /** Release subscriptions and timers; called by the plugin entry on dispose. */
   function dispose() {
+    noteTimers.forEach(clearTimeout)
+    noteTimers.clear()
+    Object.keys(snapshot.noteEdits).forEach((id) => flushNote(id).catch(() => undefined))
     disposed = true
     if (toastTimer !== null) {
       clearTimeout(toastTimer)
@@ -405,6 +528,13 @@ function createKanbanStore(ctx) {
     getSnapshot,
     subscribe,
     refresh,
+    openHome,
+    openBoard,
+    setNoteDraft,
+    createNote,
+    editNote,
+    flushNote,
+    deleteNote,
     createTask,
     updateTask,
     moveTask,

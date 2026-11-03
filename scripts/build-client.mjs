@@ -23,6 +23,7 @@ const PARTS = [
   '45-task-editor.js',
   '50-archive-modal.js',
   '55-board.js',
+  '56-home.js',
   '58-attachment-preview.js',
   '59-data-transfer.js',
   '60-session-bridge.js',

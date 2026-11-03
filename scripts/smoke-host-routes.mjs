@@ -81,7 +81,7 @@ async function call(pathname, method = 'POST', body) {
   return { status: response.status, headers: response.headers, json, text, bytes: response }
 }
 
-check(routes.size === 13, 'expected 13 registered routes, got ' + routes.size)
+check(routes.size === 16, 'expected 16 registered routes, got ' + routes.size)
 
 // state
 const state0 = await call('/api/kanban.state', 'GET')
@@ -91,6 +91,18 @@ check(state0.json.workspaces.length === 2, 'state workspaces wrong')
 check(Array.isArray(state0.json.boards) && state0.json.boards.length === 0, 'state boards wrong')
 check(state0.json.workspaces[0].id === 'ws-a' && state0.json.workspaces[0].title === 'Alpha', 'workspace projection wrong')
 check(state0.headers.get('cache-control') === 'no-store', 'state must be no-store')
+
+// Global notes and completion history use the authenticated route table.
+check(state0.json.notes.length === 0 && state0.json.completions.length === 0, 'empty home data wrong')
+const noteResult = await call('/api/kanban.note.create', 'POST', { input: { content: 'A note', color: 'blue' } })
+check(noteResult.status === 200 && noteResult.json.note.color === 'blue', 'note create failed')
+const noteId = noteResult.json.note.id
+const noteEdit = await call('/api/kanban.note.update', 'POST', { id: noteId, input: { content: 'Edited', color: 'mint' } })
+check(noteEdit.json.note.content === 'Edited', 'note update failed')
+const invalidNote = await call('/api/kanban.note.create', 'POST', { input: { content: '' } })
+check(invalidNote.status === 400, 'invalid note must return 400')
+await call('/api/kanban.note.delete', 'POST', { id: noteId })
+check((await call('/api/kanban.state', 'GET')).json.notes.length === 0, 'note delete failed')
 
 // create
 const created = await call('/api/kanban.task.create', 'POST', {

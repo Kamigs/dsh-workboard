@@ -13,6 +13,7 @@
  */
 import { copyFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 /** Task lifecycle columns, in board order. */
 export const STATUSES = ['todo', 'doing', 'done']
@@ -28,6 +29,19 @@ export const MAX_DESCRIPTION_LENGTH = 20000
 
 /** Maximum number of tags per task. */
 export const MAX_TAGS = 12
+
+export const NOTE_COLORS = ['yellow', 'pink', 'blue', 'mint', 'purple', 'neutral']
+export const MAX_NOTE_LENGTH = 4000
+
+function normalizeNoteInput(input) {
+  if (!input || typeof input.content !== 'string' || !input.content.trim()
+    || input.content.length > MAX_NOTE_LENGTH) {
+    throw kanbanError('kanban/invalid-note', `Note content must contain 1–${MAX_NOTE_LENGTH} characters.`)
+  }
+  const color = input.color ?? 'yellow'
+  if (!NOTE_COLORS.includes(color)) throw kanbanError('kanban/invalid-note-color', 'Unknown note color.')
+  return { content: input.content.trim(), color }
+}
 
 /** Calendar-day shape accepted for start/due dates. */
 const DAY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
@@ -498,6 +512,8 @@ export class KanbanStore {
     this.tasks = []
     /** @type {{ id: string, title: string, createdAt: string, updatedAt: string }[]} */
     this.boards = []
+    this.notes = []
+    this.completions = []
     this.workspaceBoardTitles = {}
     /** @type {Map<string, { name: string, type: string, size: number }>} */
     this.attachmentIndex = new Map()
@@ -588,6 +604,24 @@ export class KanbanStore {
     }
     this.boards = boards
     this.boardCounter = highestBoard
+    const noteIds = new Set()
+    for (const raw of Array.isArray(parsed.notes) ? parsed.notes : []) {
+      try {
+        if (typeof raw?.id !== 'string' || !/^note_[a-z0-9-]+$/.test(raw.id) || noteIds.has(raw.id)) continue
+        const input = normalizeNoteInput(raw)
+        if (!Number.isFinite(Date.parse(raw.createdAt)) || !Number.isFinite(Date.parse(raw.updatedAt))) continue
+        this.notes.push({ id: raw.id, ...input, createdAt: raw.createdAt, updatedAt: raw.updatedAt })
+        noteIds.add(raw.id)
+      } catch { /* Salvage other valid records, as with tasks. */ }
+    }
+    this.completions = (Array.isArray(parsed.completions) ? parsed.completions : [])
+      .filter((event) => /^task_[a-z0-9]+$/.test(event?.taskId) && Number.isFinite(Date.parse(event.at)))
+      .map(({ taskId, at }) => ({ taskId, at }))
+    // Deleted tasks' completion history must never share an id with a new task.
+    for (const { taskId } of this.completions) {
+      const suffix = Number.parseInt(taskId.slice(5), 36)
+      if (Number.isSafeInteger(suffix)) this.taskCounter = Math.max(this.taskCounter, suffix)
+    }
     if (isPlainObject(parsed.workspaceBoardTitles)) {
       this.workspaceBoardTitles = Object.fromEntries(Object.entries(parsed.workspaceBoardTitles)
         .filter(([, title]) => typeof title === 'string' && title.trim() !== ''))
@@ -663,12 +697,14 @@ export class KanbanStore {
 
   /** Apply one mutation to a detached draft inside the write queue. */
   async _commitTasks(change) {
-    const draft = structuredClone({ version: 1, boards: this.boards, tasks: this.tasks, workspaceBoardTitles: this.workspaceBoardTitles })
+    const draft = structuredClone({ version: 1, boards: this.boards, tasks: this.tasks, workspaceBoardTitles: this.workspaceBoardTitles, notes: this.notes, completions: this.completions })
     const result = change(draft)
     await writeJsonAtomic(this.stateFile, draft)
     this.tasks = draft.tasks
     this.boards = draft.boards
     this.workspaceBoardTitles = draft.workspaceBoardTitles
+    this.notes = draft.notes
+    this.completions = draft.completions
     return result
   }
 
@@ -840,6 +876,40 @@ export class KanbanStore {
     return this.tasks.map(cloneTask)
   }
 
+  async homeData() {
+    await this._ready
+    await this._tail
+    return structuredClone({ notes: this.notes, completions: this.completions })
+  }
+
+  async createNote(input) {
+    const fields = normalizeNoteInput(input)
+    return this._changeTasks(({ notes }) => {
+      const now = new Date().toISOString()
+      const note = { id: 'note_' + randomUUID(), ...fields, createdAt: now, updatedAt: now }
+      notes.push(note)
+      return structuredClone(note)
+    })
+  }
+
+  async updateNote(id, input) {
+    const fields = normalizeNoteInput(input)
+    return this._changeTasks(({ notes }) => {
+      const note = notes.find((entry) => entry.id === id)
+      if (!note) throw kanbanError('kanban/note-not-found', 'Note not found.')
+      Object.assign(note, fields, { updatedAt: new Date().toISOString() })
+      return structuredClone(note)
+    })
+  }
+
+  async deleteNote(id) {
+    return this._changeTasks(({ notes }) => {
+      const index = notes.findIndex((entry) => entry.id === id)
+      if (index < 0) throw kanbanError('kanban/note-not-found', 'Note not found.')
+      notes.splice(index, 1)
+    })
+  }
+
   /**
    * Create one task at the end of its column.
    * @param {unknown} workspaceId
@@ -847,7 +917,7 @@ export class KanbanStore {
    * @returns {Promise<object>} the created task
    */
   async create(workspaceId, input) {
-    return this._changeTasks(({ tasks }) => {
+    return this._changeTasks(({ tasks, completions }) => {
       const workspace = normalizeWorkspaceId(workspaceId)
       const fields = normalizeTaskInput(input)
       const now = new Date().toISOString()
@@ -873,6 +943,7 @@ export class KanbanStore {
       }
       this._checkSessionAvailable(tasks, task, task.sessionId)
       tasks.push(task)
+      if (task.status === 'done') completions.push({ taskId: task.id, at: now })
       return cloneTask(task)
     })
   }
@@ -884,13 +955,14 @@ export class KanbanStore {
    * @returns {Promise<object>} the updated task
    */
   async update(id, patch) {
-    return this._changeTasks(({ tasks }) => {
+    return this._changeTasks(({ tasks, completions }) => {
       const task = this._requireTask(tasks, id)
       const next = applyTaskPatch(task, patch)
       if (next.sessionId !== task.sessionId) this._checkSessionAvailable(tasks, task, next.sessionId)
       const previousStatus = task.status
       Object.assign(task, next)
       task.updatedAt = new Date().toISOString()
+      if (previousStatus !== 'done' && task.status === 'done') completions.push({ taskId: task.id, at: task.updatedAt })
       if (task.status !== previousStatus) {
         task.order = tasks.filter((entry) =>
           entry.workspaceId === task.workspaceId && entry.status === task.status && entry.id !== task.id).length
@@ -909,7 +981,7 @@ export class KanbanStore {
    * @returns {Promise<object[]>} every task after the move
    */
   async move(id, status, beforeId) {
-    return this._changeTasks(({ tasks }) => {
+    return this._changeTasks(({ tasks, completions }) => {
       const task = this._requireTask(tasks, id)
       const target = normalizeStatus(status)
       const previousStatus = task.status
@@ -929,6 +1001,7 @@ export class KanbanStore {
       })
       if (target !== previousStatus) this._densify(tasks, task.workspaceId, previousStatus)
       task.updatedAt = new Date().toISOString()
+      if (previousStatus !== 'done' && target === 'done') completions.push({ taskId: task.id, at: task.updatedAt })
       return tasks.map(cloneTask)
     })
   }

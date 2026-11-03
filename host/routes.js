@@ -150,7 +150,30 @@ export function registerKanbanRoutes(ctx, store) {
         workspaces: await store.workspaceBoards(listWorkspaces(ctx)),
         boards: await store.listBoards(),
         tasks: await store.list(),
+        ...await store.homeData(),
       })),
+    },
+    {
+      path: '/api/kanban.note.create', methods: ['POST'],
+      handler: guard(store, async (request) => {
+        const body = await readJsonObject(request)
+        return jsonResponse({ ok: true, note: await store.createNote(body.input) })
+      }),
+    },
+    {
+      path: '/api/kanban.note.update', methods: ['POST'],
+      handler: guard(store, async (request) => {
+        const body = await readJsonObject(request)
+        return jsonResponse({ ok: true, note: await store.updateNote(body.id, body.input) })
+      }),
+    },
+    {
+      path: '/api/kanban.note.delete', methods: ['POST'],
+      handler: guard(store, async (request) => {
+        const body = await readJsonObject(request)
+        await store.deleteNote(body.id)
+        return jsonResponse({ ok: true })
+      }),
     },
     {
       path: '/api/kanban.board.create',
@@ -186,7 +209,7 @@ export function registerKanbanRoutes(ctx, store) {
       handler: guard(store, async (request) => {
         const body = await readJsonObject(request)
         const task = await store.create(body.workspaceId, body.input)
-        return jsonResponse({ ok: true, task })
+        return jsonResponse({ ok: true, task, completions: (await store.homeData()).completions })
       }),
     },
     {
@@ -195,7 +218,7 @@ export function registerKanbanRoutes(ctx, store) {
       handler: guard(store, async (request) => {
         const body = await readJsonObject(request)
         const task = await store.update(body.id, body.patch)
-        return jsonResponse({ ok: true, task })
+        return jsonResponse({ ok: true, task, completions: (await store.homeData()).completions })
       }),
     },
     {
@@ -204,7 +227,7 @@ export function registerKanbanRoutes(ctx, store) {
       handler: guard(store, async (request) => {
         const body = await readJsonObject(request)
         const tasks = await store.move(body.id, body.status, body.beforeId)
-        return jsonResponse({ ok: true, tasks })
+        return jsonResponse({ ok: true, tasks, completions: (await store.homeData()).completions })
       }),
     },
     {

@@ -26,6 +26,7 @@ let hooks = []
 let hookIndex = 0
 let instances = new Map()
 const effects = []
+const renderCleanups = []
 const renderedElements = []
 
 function slot(initial) {
@@ -152,7 +153,7 @@ function render(Component, props, passes = 3) {
     output = renderNode(React.createElement(Component, props))
     const pending = effects.slice()
     effects.length = 0
-    for (const effect of pending) effect()
+    for (const effect of pending) { const cleanup = effect(); if (typeof cleanup === 'function') renderCleanups.push(cleanup) }
   }
   return output
 }
@@ -347,7 +348,7 @@ const sandbox = {
 vm.createContext(sandbox)
 const instrumented = readFileSync(bundlePath, 'utf8').replace(
   '\nreturn {\n  inject:',
-  '  globalThis.__KANBAN_TEST__ = { TaskEditorDialog, ArchivedTaskList, TaskCard, TaskDetailPanel, AttachmentPreviewRail, DateField, PriorityBadge, NewBoardDialog, KbnImportReview, kbnExportPayload, kbnParseImport, kbnImportTasks, kbnExportFileName, StatusDot, Modal, Button, allDicts: DICT, getStore: () => kanbanStore, loadAccount: () => loadKbnAccount(kanbanStore.ctx), currentDetailWidth: () => kbnDetailWidth, readDetailWidth: () => kbnReadDetailWidth(), storeDetailWidth: (width) => kbnStoreDetailWidth(width), boardsOf: (snapshot) => boardsOf(snapshot), boardOf: (snapshot, id) => boardOf(snapshot, id), ensureBoardWorkspace: (task) => ensureBoardWorkspace(task), createBoard: (title) => kanbanStore.createBoard(title) };\n  return {\n    inject:',
+  '  globalThis.__KANBAN_TEST__ = { kbnHeatmap, WorkboardHome, TaskEditorDialog, ArchivedTaskList, TaskCard, TaskDetailPanel, AttachmentPreviewRail, DateField, PriorityBadge, NewBoardDialog, KbnImportReview, kbnExportPayload, kbnParseImport, kbnImportTasks, kbnExportFileName, StatusDot, Modal, Button, allDicts: DICT, getStore: () => kanbanStore, loadAccount: () => loadKbnAccount(kanbanStore.ctx), currentDetailWidth: () => kbnDetailWidth, readDetailWidth: () => kbnReadDetailWidth(), storeDetailWidth: (width) => kbnStoreDetailWidth(width), boardsOf: (snapshot) => boardsOf(snapshot), boardOf: (snapshot, id) => boardOf(snapshot, id), ensureBoardWorkspace: (task) => ensureBoardWorkspace(task), createBoard: (title) => kanbanStore.createBoard(title) };\n  return {\n    inject:',
 )
 check_instrumented: { if (!instrumented.includes('__KANBAN_TEST__')) console.error('smoke: could not instrument bundle') }
 vm.runInContext(instrumented, sandbox, { filename: 'lib/client.js' })
@@ -356,6 +357,40 @@ if (definition === null) throw new Error('smoke: bundle did not register a Modul
 if (definition.id !== 'dsh-workboard') throw new Error('smoke: bundle id is ' + definition.id)
 
 const nativeUI = {
+  IconArchiveOutlineRegular: () => React.createElement('svg'),
+  IconCheckCircleOutlineRegular: () => React.createElement('svg'),
+  IconCheckOutlineRegular: () => React.createElement('svg'),
+  IconChevronDownOutlineRegular: () => React.createElement('svg'),
+  IconChevronLeftOutlineRegular: () => React.createElement('svg'),
+  IconChevronRightOutlineRegular: () => React.createElement('svg'),
+  IconClockOutlineRegular: () => React.createElement('svg'),
+  IconCloseOutlineRegular: () => React.createElement('svg'),
+  IconDataOutlineRegular: () => React.createElement('svg'),
+  IconDownloadOutlineRegular: () => React.createElement('svg'),
+  IconEditOutlineRegular: () => React.createElement('svg'),
+  IconEnhanceOutlineRegular: () => React.createElement('svg'),
+  IconFlatListOutlineRegular: () => React.createElement('svg'),
+  IconFolderOpenOutlineRegular: () => React.createElement('svg'),
+  IconLinkOutlineRegular: () => React.createElement('svg'),
+  IconLoadingOutlineRegular: () => React.createElement('svg'),
+  IconPaperclipOutlineRegular: () => React.createElement('svg'),
+  IconPlayOutlineRegular: () => React.createElement('svg'),
+  IconPlusOutlineRegular: () => React.createElement('svg'),
+  IconProjectAddOutlineRegular: () => React.createElement('svg'),
+  IconRefreshOutlineRegular: () => React.createElement('svg'),
+  IconSearchOutlineRegular: () => React.createElement('svg'),
+  IconSendOutlineRegular: () => React.createElement('svg'),
+  IconSettingsOutlineMedium: () => React.createElement('svg'),
+  IconStopFillRegular: () => React.createElement('svg'),
+  IconTrashOutlineRegular: () => React.createElement('svg'),
+  IconUnarchiveOutlineRegular: () => React.createElement('svg'),
+  IconUserOutlineRegular: () => React.createElement('svg'),
+  IconWarningTriangleOutlineRegular: () => React.createElement('svg'),
+  Input: ({ icon, ...props }) => React.createElement('span', {}, icon, React.createElement('input', props)),
+  InlineEditor: ({ value, label, onChange }) => React.createElement('textarea', { value, 'aria-label': label, onChange: (e) => onChange(e.currentTarget.value) }),
+  Tooltip: ({ children }) => children,
+  Toast: ({ text }) => React.createElement('div', { role: 'status' }, text),
+
   IconChevronDownOutlineRegular: () => React.createElement('svg'),
   MenuSurface: (props) => React.createElement('section', props),
   IconPlusOutlineRegular: () => React.createElement('svg'),
@@ -528,6 +563,12 @@ check(glyph.includes('<svg'), 'sidebar glyph did not render an svg')
 // Warm the store, then render the board twice (mount + after data arrives).
 render(mainEntry.component, {})
 await new Promise((resolve) => setTimeout(resolve, 2))
+const home = render(mainEntry.component, {})
+check(home.includes('kbn-heat-grid') && home.includes('灵感便签'), 'home must show heatmap and ideas')
+check(home.includes('Sprint board') && home.includes('web-app'), 'home must include all boards')
+check(!home.includes('kbn-workbench'), 'sidebar must land on home, not remembered board details')
+const homeCard = renderedElements.find((node) => node.props['data-board-id'] === 'ws-a')
+homeCard.props.onClick()
 const boardOne = render(mainEntry.component, {})
 await new Promise((resolve) => setTimeout(resolve, 2))
 const boardTwo = render(mainEntry.component, {})
@@ -931,8 +972,12 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   hostWorkspaces = []
   await store.refresh()
   const orphanBoard = render(mainEntry.component, {})
-  check(orphanBoard.includes('还没有看板'), 'tasks left behind by removed workspaces must render the empty board state')
+  check(orphanBoard.includes('创建你的第一块看板'), 'tasks left behind by removed workspaces must render the empty board state')
 }
+
+// Release component timers (including the heatmap midnight refresh).
+renderCleanups.forEach((cleanup) => cleanup())
+disposers.forEach((dispose) => dispose())
 
 /* ------------------------------------------------------------------ report */
 if (failures.length > 0) {

@@ -11,32 +11,18 @@
  * @returns {object} React element
  */
 function PanelGlyph({ size }) {
-  return h(Icon, { name: 'board', size: typeof size === 'number' && size > 0 ? size : 20 })
+  const ref = useRef(null)
+  useEffect(() => {
+    // The host owns the sidebar button. Bind only the button containing our
+    // slot glyph, including keyboard activation; leave its navigation intact.
+    const button = ref.current?.closest('button')
+    const home = () => kanbanStore.openHome()
+    button?.addEventListener('click', home)
+    return () => button?.removeEventListener('click', home)
+  }, [])
+  return h('span', { ref, className: 'kbn-panel-glyph' },
+    h(DshUI.IconFlatListOutlineRegular, { size: typeof size === 'number' && size > 0 ? size : 20 }))
 }
-
-/** DSH currently assigns plugin settings a fixed gear, without an icon slot. */
-function installSettingsNavIcon() {
-  if (typeof MutationObserver !== 'function') return
-  const update = () => {
-    document.querySelectorAll('[data-shortcut-modal="settings"] nav button').forEach((button) => {
-      button.toggleAttribute('data-kbn-settings-nav', button.textContent.trim() === t('panel.title'))
-    })
-  }
-  const observer = new MutationObserver(update)
-  observer.observe(document.body, { childList: true, characterData: true, subtree: true })
-  update()
-  return () => {
-    observer.disconnect()
-    document.querySelectorAll('[data-kbn-settings-nav]').forEach((button) => button.removeAttribute('data-kbn-settings-nav'))
-  }
-}
-
-// Both navigation surfaces use the same DSH vector and inherit their text color.
-const settingsBoardMask = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${ICON_DATA.board.vb}" fill="none" stroke="black">${ICON_DATA.board.paths.map((path) => `<path d="${path.d}"/>`).join('')}</svg>`)
-addStyle(`
-[data-kbn-settings-nav] > svg { display: none; }
-[data-kbn-settings-nav]::before { content: ''; display: block; width: 16px; height: 16px; flex-shrink: 0; background: currentColor; mask: url("data:image/svg+xml,${settingsBoardMask}") center / contain no-repeat; }
-`)
 
 /**
  * Client plugin body.
@@ -67,8 +53,6 @@ function apply(ctx) {
     }
   }, 'kanban: stylesheet')
 
-  ctx.effect(installSettingsNavIcon, 'kanban: settings navigation icon')
-
   kanbanStore = createKanbanStore(ctx)
   // Load once at activation so session-header task links work before the board
   // panel has ever been opened; a failure keeps the board's own retry state.
@@ -96,7 +80,7 @@ function apply(ctx) {
     name: 'main',
     key: PANEL_ID,
     locale: NS,
-  }, BoardPage))
+  }, WorkboardPage))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

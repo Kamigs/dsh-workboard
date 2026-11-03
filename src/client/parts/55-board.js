@@ -236,8 +236,8 @@ function NewBoardDialog({ open, onClose }) {
   }
 
   const footer = [
-    h(Button, { key: 'cancel', variant: 'ghost', size: 'sm', disabled: busy, onClick: () => onClose() }, t('common.cancel')),
-    h(Button, { key: 'create', variant: 'primary', size: 'sm', disabled: busy, onClick: save }, t('board.createAction')),
+    h(DshUI.Button, { key: 'cancel', variant: 'ghost', size: 'sm', disabled: busy, onClick: () => onClose() }, t('common.cancel')),
+    h(DshUI.Button, { key: 'create', variant: 'primary', size: 'sm', disabled: busy, onClick: save }, t('board.createAction')),
   ]
 
   return h(DshUI.Modal, {
@@ -250,14 +250,14 @@ function NewBoardDialog({ open, onClose }) {
   }, h('div', { className: 'kbn-project-dialog' },
     error !== null ? h('p', { className: 'kbn-editor-error', role: 'alert' }, error) : null,
     h(Field, { label: t('board.nameLabel') },
-      h(Input, {
+      h(DshUI.Input, {
         value: title,
-        onChange: (value) => setTitle(kbnFieldValue(value)),
+        onChange: (event) => setTitle(event.currentTarget.value),
         placeholder: t('board.namePlaceholder'),
         maxLength: 80,
         disabled: busy,
         autoFocus: true,
-        ariaLabel: t('board.nameLabel'),
+        'aria-label': t('board.nameLabel'),
         onKeyDown: (event) => {
           if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
             event.preventDefault()
@@ -646,7 +646,7 @@ function revealMovedCard(card, from) {
 function BoardPage(props) {
   const store = kanbanStore
   const state = store.use((snapshot) => snapshot)
-  const [workspaceId, setWorkspaceId] = useState(kbnLastWorkspaceId)
+  const [workspaceId, setWorkspaceId] = useState(props?.boardId || kbnLastWorkspaceId)
   const [sendTask, setSendTask] = useState(null)
   const [editor, setEditor] = useState(null)
   const [boardOpen, setBoardOpen] = useState(false)
@@ -1049,6 +1049,10 @@ function BoardPage(props) {
   return h('div', { className: 'kbn-root' },
     h('div', { className: 'kbn-page' },
       h('header', { className: 'kbn-head' },
+        h(DshUI.Button, {
+          className: 'kbn-head-back', variant: 'ghost', size: 'sm', 'aria-label': t('home.back'),
+          onClick: () => store.openHome(), icon: h(DshUI.IconChevronLeftOutlineRegular, { size: 16 }),
+        }, t('home.back')),
         h('div', { className: 'kbn-head-main' },
           h('h1', { className: 'kbn-board-heading', 'aria-label': activeBoard?.title || t('board.selectBoard') },
             h(BoardSwitcher, {
@@ -1056,6 +1060,7 @@ function BoardPage(props) {
               onChange: (next) => {
                 kbnRememberBoard(next)
                 setSelectedTaskId(null)
+                store.openBoard(next)
                 setWorkspaceId(next)
               },
             })),
@@ -1127,6 +1132,7 @@ function BoardPage(props) {
         setBoardOpen(false)
         if (board !== null && board !== undefined && typeof board.id === 'string') {
           kbnRememberBoard(board.id)
+          store.openBoard(board.id)
           setWorkspaceId(board.id)
           setSelectedTaskId(null)
         }
