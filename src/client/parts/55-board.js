@@ -980,12 +980,6 @@ function BoardPage(props) {
     h('div', { className: 'kbn-page' },
       h('header', { className: 'kbn-head' },
         h('div', { className: 'kbn-head-main' },
-          h('h1', { className: 'kbn-title' }, t('panel.title')),
-          h('p', { className: 'kbn-subtitle' },
-            activeBoard !== null
-              ? t('board.subtitle', { open: openCount, done: doneCount })
-              : t('board.subtitleEmpty'))),
-        h('div', { className: 'kbn-head-actions' },
           h('div', { className: 'kbn-ws-select', title: activeBoard?.title },
             h(Select, {
               value: activeBoardId === null ? '' : activeBoardId,
@@ -999,6 +993,11 @@ function BoardPage(props) {
               placeholder: t('board.selectBoard'),
               ariaLabel: t('board.selectBoard'),
             })),
+          h('p', { className: 'kbn-subtitle' },
+            activeBoard !== null
+              ? t('board.subtitle', { open: openCount, done: doneCount })
+              : t('board.subtitleEmpty'))),
+        h('div', { className: 'kbn-head-actions' },
           h(DshUI.Button, {
             variant: 'ghost', size: 'sm',
             title: t('settings.open'), 'aria-label': t('settings.open'), 'aria-haspopup': 'dialog',

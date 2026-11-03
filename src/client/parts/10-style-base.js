@@ -34,11 +34,9 @@ addStyle(`
 
 .kbn-head-main{display:flex;flex-direction:column;gap:2px;flex:1 1 140px;min-width:0}
 
-.kbn-title{margin:0;font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.01em;color:var(--dsw-alias-label-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
 .kbn-subtitle{margin:0;font-size:13px;line-height:20px;font-weight:400;color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}
 
-.kbn-head-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:100%;margin-inline-start:auto;padding-top:2px}
+.kbn-head-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:100%;margin-inline-start:auto}
 
 .kbn-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:none;padding:0 24px 12px}
 

@@ -73,6 +73,7 @@ addStyle(`
 /* -------------------------------------------------------- header board switcher */
 
 .kbn-ws-select {
+  align-self: flex-start;
   display: flex;
   align-items: center;
   max-width: 100%;
@@ -81,12 +82,6 @@ addStyle(`
 
 .kbn-ws-select .kbn-input-wrap { width: auto; max-width: 220px; }
 .kbn-ws-select .kbn-select { field-sizing: content; width: auto; max-width: 100%; text-overflow: ellipsis; }
-.kbn-ws-select::after {
-  content: '';
-  height: 18px;
-  margin-inline-start: 10px;
-  border-inline-end: 1px solid var(--dsw-alias-border-l2);
-}
 
 /* ----------------------------------------------------------------- columns */
 
