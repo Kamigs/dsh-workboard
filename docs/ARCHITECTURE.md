@@ -313,6 +313,8 @@ Its sections appear in this order: board list, archived tasks, data transfer.
 Sections use dividers; individual board rows remain compact bordered controls.
 Archive groups show their three most recent tasks with a per-group expand
 button for the rest. Settings toasts appear at the dialog's bottom right.
+Board toasts appear at the panel's top centre, with their width constrained to
+the panel so task-detail footer actions remain visible in narrow layouts.
 Workspace board names are stored in the plugin’s `workspaceBoardTitles` map
 by workspace ID; they do not rename the Harness workspace or directory.
 

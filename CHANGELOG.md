@@ -39,6 +39,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Board notifications appear at the top centre instead of covering task-detail
+  actions in the bottom-right corner.
 - Board rename persistence, menu placement, duplicate status labels,
   status-coloured selection rings and card action alignment.
 - Conversation-panel toggle contrast and positioning within the conversation.
