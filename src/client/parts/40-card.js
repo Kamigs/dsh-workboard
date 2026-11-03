@@ -249,6 +249,7 @@ function TaskCard({
     draggable: busy ? false : true,
     'aria-label': title,
     'data-task-id': task.id,
+    'data-status': task.status,
     'data-selected': selected ? 'true' : undefined,
     'data-dragging': dragging ? 'true' : undefined,
     'data-ai': isAI ? 'true' : undefined,
