@@ -719,20 +719,19 @@ addStyle(`
 }
 
 .kbn-archive-group-title {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0;
   padding: 4px 2px;
-  background: var(--dsw-alias-bg-layer-2);
   color: var(--dsw-alias-label-secondary);
   font-size: 13px;
   line-height: 20px;
   font-weight: 500;
 }
+.kbn-archive-count { flex: none; font-weight: 400; }
+.kbn-archive-more { align-self: flex-start; }
+.kbn-archive-rows { display: grid; gap: 6px; min-width: 0; }
 .kbn-archive-group-title > svg { flex: none; color: var(--dsw-alias-label-tertiary); }
 .kbn-archive-group-title > span {
   min-width: 0;

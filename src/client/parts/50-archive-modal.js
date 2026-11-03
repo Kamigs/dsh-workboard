@@ -1,5 +1,5 @@
 /**
- * Archive dialog: archived tasks grouped by board, with restore, inline
+ * Archive settings: archived tasks grouped by board, with restore, inline
  * two-click delete and a jump to the linked harness session.
  */
 addDict(
@@ -14,6 +14,8 @@ addDict(
     'archive.archivedOn': '归档于 {date}',
     'archive.noDate': '归档日期未知',
     'archive.tagsMore': '还有 {count} 个标签',
+    'archive.showMore': '展开其余 {count} 项',
+    'archive.showLess': '收起',
   },
   {
     'archive.title': 'Archived tasks',
@@ -26,6 +28,8 @@ addDict(
     'archive.archivedOn': 'Archived {date}',
     'archive.noDate': 'Archived date unknown',
     'archive.tagsMore': '{count} more tags',
+    'archive.showMore': 'Show {count} more',
+    'archive.showLess': 'Show less',
   },
 )
 
@@ -62,6 +66,7 @@ function ArchivedTaskList({ close }) {
   const archived = archivedTasks(state)
   const [busyId, setBusyId] = useState(null)
   const [confirmId, setConfirmId] = useState(null)
+  const [expandedBoards, setExpandedBoards] = useState({})
 
   useEffect(() => {
     if (confirmId === null) return undefined
@@ -101,7 +106,7 @@ function ArchivedTaskList({ close }) {
     const key = typeof task.workspaceId === 'string' ? task.workspaceId : ''
     let group = byWorkspace.get(key)
     if (group === undefined) {
-      group = { workspace: boardOf(state, key), tasks: [] }
+      group = { id: key, workspace: boardOf(state, key), tasks: [] }
       byWorkspace.set(key, group)
       groups.push(group)
     }
@@ -112,11 +117,9 @@ function ArchivedTaskList({ close }) {
   if (state.status === 'loading' && archived.length === 0) {
     body = h('div', { className: 'kbn-empty' }, h(Spinner, { size: 20, label: t('common.loading') }))
   } else if (archived.length === 0) {
-    body = h(EmptyState, {
-      icon: h(Icon, { name: 'archive', size: 22 }),
-      title: t('archive.emptyTitle'),
-      description: t('archive.emptyDesc'),
-    })
+    body = h('div', { className: 'kbn-archive-empty kbn-detail-note' },
+      h('p', null, t('archive.emptyTitle')),
+      h('p', null, t('archive.emptyDesc')))
   } else {
     body = h('div', { className: 'kbn-archive' },
       groups.map((group) => {
@@ -126,12 +129,16 @@ function ArchivedTaskList({ close }) {
         const workspacePath = group.workspace !== null && group.workspace !== undefined && typeof group.workspace.path === 'string'
           ? group.workspace.path
           : ''
-        return h('section', { className: 'kbn-archive-group', key: String(group.tasks[0].workspaceId || 'unknown') },
-          h('h3', { className: 'kbn-archive-group-title' },
+        const expanded = !!expandedBoards[group.id]
+        const visibleTasks = expanded ? group.tasks : group.tasks.slice(0, 3)
+        const listId = 'kbn-archive-tasks-' + encodeURIComponent(group.id)
+        return h('section', { className: 'kbn-archive-group', key: group.id },
+          h('h4', { className: 'kbn-archive-group-title' },
             h(Icon, { name: 'workspace', size: 14 }),
             h('span', null, workspaceTitle),
+            h('span', { className: 'kbn-archive-count' }, '(', group.tasks.length, ')'),
             workspacePath !== '' ? h('span', { className: 'kbn-archive-ws', title: workspacePath }, workspacePath) : null),
-          group.tasks.map((task) => {
+          h('div', { id: listId, className: 'kbn-archive-rows' }, visibleTasks.map((task) => {
             const tags = Array.isArray(task.tags)
               ? task.tags.filter((tag) => typeof tag === 'string' && tag !== '')
               : []
@@ -193,7 +200,16 @@ function ArchivedTaskList({ close }) {
                     }, '+' + hiddenTags)
                     : null)),
               h('div', { className: 'kbn-archive-actions' }, actions))
-          }))
+          })),
+          group.tasks.length > 3 && h(DshUI.Button, {
+            variant: 'ghost', size: 'sm', className: 'kbn-archive-more',
+            'aria-expanded': expanded, 'aria-controls': listId,
+            'aria-label': workspaceTitle + ' · ' + (expanded ? t('archive.showLess') : t('archive.showMore', { count: group.tasks.length - 3 })),
+            onClick: () => {
+              setConfirmId(null)
+              setExpandedBoards((previous) => ({ ...previous, [group.id]: !previous[group.id] }))
+            },
+          }, expanded ? t('archive.showLess') : t('archive.showMore', { count: group.tasks.length - 3 })))
       }))
   }
 

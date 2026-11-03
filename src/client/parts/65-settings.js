@@ -222,8 +222,12 @@ function WorkboardSettings({ close }) {
         })))
         : h('p', null, t('board.noBoardTitle'))),
     h('section', { className: 'kbn-settings-group' },
-      h('h3', null, t('data.trigger')),
-      h('p', { className: 'kbn-detail-note' }, t('settings.exportAll')),
+      h('h3', null, t('archive.title'), ' (', archivedTasks(state).length, ')'),
+      h(ArchivedTaskList, { close })),
+    h('section', { className: 'kbn-settings-group' },
+      h('div', { className: 'kbn-settings-copy' },
+        h('h3', null, t('data.trigger')),
+        h('p', { className: 'kbn-detail-note' }, t('settings.exportAll'))),
       h('div', { className: 'kbn-settings-actions' },
         h(DshUI.Button, { variant: 'outline', size: 'sm', onClick: handleExport }, t('data.export')),
         h(DshUI.Button, { variant: 'outline', size: 'sm', onClick: handleImportPick, disabled: !activeBoard || !!importState }, t('data.import'))),
@@ -241,22 +245,25 @@ function WorkboardSettings({ close }) {
         onCancel: () => setImportState(null),
         onConfirm: confirmImport,
       })),
-    h('details', { className: 'kbn-settings-group' },
-      h('summary', null, t('archive.title'), ' (', archivedTasks(state).length, ')'),
-      h(ArchivedTaskList, { close })),
     h(NewBoardDialog, { open: boardOpen, onClose: (board) => {
       setBoardOpen(false)
       if (board) setBoardId(board.id)
     } }),
-    state.toast && h('p', { role: 'status', className: 'kbn-detail-note' }, state.toast.message))
+    h(ToastHost))
 }
 
 addStyle(`
-.kbn-settings { display: grid; gap: 16px; color: var(--dsw-alias-label-primary); }
-.kbn-settings-group { min-width: 0; padding: 16px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-lg); }
+.kbn-settings { display: grid; gap: 24px; color: var(--dsw-alias-label-primary); }
+.kbn-settings-group { min-width: 0; }
+.kbn-settings-group + .kbn-settings-group { padding-top: 24px; border-top: 1px solid var(--dsw-alias-border-l2); }
 .kbn-settings-group > * + * { margin-top: 12px; }
-.kbn-settings-group h3, .kbn-settings-group summary { margin: 0; font-size: 14px; font-weight: 600; }
-.kbn-settings-group summary { cursor: pointer; }
+.kbn-settings-group > h3 + .kbn-detail-note { margin-top: 4px; }
+.kbn-settings-group > .kbn-detail-note p { margin: 0; }
+.kbn-settings-group > .kbn-detail-note p + p { margin-top: 4px; }
+.kbn-settings-group > .kbn-archive-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; min-height: 112px; margin-top: 12px; padding: 24px 20px; border: 1px dashed var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); text-align: center; }
+.kbn-settings-group > h3, .kbn-settings-heading > h3, .kbn-settings-copy > h3 { margin: 0; font-size: 14px; line-height: 22px; font-weight: 500; }
+.kbn-settings-copy { display: grid; gap: 4px; }
+.kbn-settings-copy > * { margin: 0; }
 .kbn-settings-group > .kbn-empty { min-height: 0; padding: 16px; }
 .kbn-settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .kbn-settings-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
