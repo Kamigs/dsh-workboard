@@ -180,8 +180,15 @@ async function ensureBoardWorkspace(task) {
   if (kanbanStore === null) return null
   const board = boardOf(kanbanStore.getSnapshot(), task.workspaceId)
   if (board === null || board.bound) return task.workspaceId
-  const ctx = kanbanStore.ctx
   kanbanStore.toast(t('bridge.bind.hint'), 'info')
+  const workspaceId = await pickBoardWorkspace(board)
+  if (workspaceId) kanbanStore.toast(t('bridge.bind.done', { title: board.title }), 'info')
+  return workspaceId
+}
+
+/** Reuse DSH's directory picker for explicit binding and the first AI dispatch. */
+async function pickBoardWorkspace(board) {
+  const ctx = kanbanStore.ctx
   let directory = null
   try {
     directory = await ctx.uiWorkspace.pickDirectory()
@@ -208,7 +215,6 @@ async function ensureBoardWorkspace(task) {
   } catch {
     // The workspace keeps its directory-derived title; binding still succeeded.
   }
-  kanbanStore.toast(t('bridge.bind.done', { title: board.title }), 'info')
   return workspaceId
 }
 

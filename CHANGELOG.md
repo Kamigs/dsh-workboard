@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Persistent home-board ordering through drag/drop with live card displacement
+  and accessible move buttons. Cancelling a drag restores the previous layout.
+- Task multi-selection using Cmd/Ctrl-click and Shift-click ranges, with group
+  dragging and atomic batch status changes. Selection uses card highlights
+  without checkboxes, a selection toolbar or instruction text.
+- Explicit workspace binding and unbinding in board details, retaining tasks,
+  archived state, attachments and completion history. Unbinding clears task
+  session links while leaving DSH workspaces and conversations intact.
+
+### Fixed
+
+- Native dragging keeps the source in place until the first dragover, uses the
+  browser's card preview, and prevents avatars from starting separate image drags.
+- Task dragging reserves a card-height dashed, rounded placeholder at the drop
+  position, including empty columns, instead of a line and whole-column tint.
+- Board details now offer **New task**, opening the To do task editor.
+- Centered the settings icon and aligned it with the adjacent primary action.
+- Workspace binding preserves the board name, saved position and selection;
+  unknown workspace destinations are rejected.
+
 ## [0.1.0-beta-pre] - 2026-11-04
 
 ### Added

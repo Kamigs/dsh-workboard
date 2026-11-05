@@ -127,10 +127,6 @@ addStyle(`
 :is(.kbn-col, .kbn-card)[data-status=doing] { --kbn-col-tone: var(--dsw-alias-state-business-primary); }
 :is(.kbn-col, .kbn-card)[data-status=done]  { --kbn-col-tone: var(--dsw-alias-state-success-primary); }
 
-.kbn-col[data-drop=true] {
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--dsw-alias-state-business-primary) 70%, transparent);
-}
-
 .kbn-col-head {
   display: flex;
   align-items: center;
@@ -180,25 +176,8 @@ addStyle(`
   flex: none;
 }
 
-.kbn-col-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  flex: none;
-  padding: 0;
-  border: 0;
-  border-radius: var(--dsw-radius-xs);
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-  transition: background-color .12s var(--ds-ease-in-out), color .12s var(--ds-ease-in-out);
-}
-.kbn-col-add:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
-.kbn-col-add:disabled { opacity: .4; cursor: not-allowed; }
-
 .kbn-col-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -220,18 +199,6 @@ addStyle(`
 }
 .kbn-col-body::-webkit-scrollbar-thumb:hover { background: var(--dsw-alias-scrollbar-hover-l2); background-clip: content-box; }
 
-.kbn-col-body.kbn-drop-target {
-  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, transparent);
-  border-radius: var(--dsw-radius-md);
-}
-
-/* Drop zone outline while a card hovers this column. */
-.kbn-col-drop {
-  outline: 1.5px dashed color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent);
-  outline-offset: -3px;
-  border-radius: var(--dsw-radius-md);
-}
-
 .kbn-col-empty {
   margin: 2px 2px 4px;
   padding: 14px 8px;
@@ -245,7 +212,8 @@ addStyle(`
 
 /* -------------------------------------------------------------------- cards */
 
-.kbn-card-slot { display: block; min-width: 0; }
+.kbn-card-slot { display: block; min-width: 0; flex: none; }
+.kbn-card-slot[data-drag-source=true] { position: absolute; top: 0; left: 0; opacity: 0; pointer-events: none; }
 
 .kbn-board > .kbn-card-flight {
   position: absolute;
@@ -269,6 +237,7 @@ addStyle(`
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   cursor: grab;
+  user-select: none;
   transition: background-color .15s var(--ds-ease-in-out), border-color .15s var(--ds-ease-in-out), box-shadow .15s var(--ds-ease-in-out), opacity .12s var(--ds-ease-in-out);
 }
 .kbn-card:hover {
@@ -478,13 +447,18 @@ addStyle(`
 
 /* ----------------------------------------------------------- drop indicator */
 
-.kbn-drop-line {
-  height: 2px;
-  margin: 2px 0;
-  border-radius: 2px;
-  background: var(--dsw-alias-state-business-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
-  pointer-events: none;
+.kbn-drop-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex: none;
+  width: 100%;
+  border: 1.5px dashed var(--kbn-col-tone);
+  border-radius: var(--dsw-radius-lg);
+  background: color-mix(in srgb, var(--kbn-col-tone) 6%, transparent);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
 }
 
 /* ------------------------------------------------------------ task editor */
@@ -849,7 +823,6 @@ addStyle(`
 
 /* -------------------------------------------------- focus + reduced motion */
 
-.kbn-root .kbn-col-add:focus-visible,
 .kbn-root .kbn-card-action:focus-visible,
 .kbn-root .kbn-tag-x:focus-visible,
 .kbn-root .kbn-attach-x:focus-visible,
@@ -879,7 +852,6 @@ addStyle(`
   .kbn-card,
   .kbn-card-actions,
   .kbn-card-action,
-  .kbn-col-add,
   .kbn-tag-input,
   .kbn-tag-x,
   .kbn-attach-x,

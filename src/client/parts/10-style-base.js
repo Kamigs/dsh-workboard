@@ -38,7 +38,11 @@ addStyle(`
 
 .kbn-subtitle{margin:0;font-size:13px;line-height:20px;font-weight:400;color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}
 
-.kbn-head-actions{display:flex;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:100%;margin-inline-start:auto}
+.kbn-head-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;max-width:100%;margin-inline-start:auto}
+.kbn-head-settings{display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box;width:36px!important;min-width:36px!important;height:36px!important;padding:0!important;flex:none}
+.kbn-board-binding{align-self:flex-start;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.kbn-board-binding-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kbn-binding-path{margin:0;overflow-wrap:anywhere;font-size:13px;color:var(--dsw-alias-label-secondary)}
 
 .kbn-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:none;padding:0 24px 12px}
 

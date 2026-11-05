@@ -238,8 +238,9 @@ function TaskCard({
     if (typeof onDragEnd === 'function') onDragEnd()
   }
 
-  const select = () => {
-    if (typeof onSelect === 'function') onSelect(task)
+  const select = (event) => {
+    if (busy) return
+    if (typeof onSelect === 'function') onSelect(task, event)
   }
 
   return h('article', {
@@ -252,13 +253,21 @@ function TaskCard({
     'data-status': task.status,
     'data-selected': selected ? 'true' : undefined,
     'data-dragging': dragging ? 'true' : undefined,
+    'aria-pressed': selected,
     'data-ai': isAI ? 'true' : undefined,
     'data-has-send': showSend ? 'true' : undefined,
     onClick: select,
+    onContextMenu: (event) => {
+      // macOS sends Control-click as contextmenu instead of click.
+      if (!event.ctrlKey || event.target.closest('button, input, select, textarea, a')) return
+      event.preventDefault()
+      event.stopPropagation()
+      select(event)
+    },
     onKeyDown: (event) => {
       if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
       event.preventDefault()
-      select()
+      select(event)
     },
     onDragStart: beginDrag,
     onDragEnd: endDrag,

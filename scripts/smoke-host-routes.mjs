@@ -81,7 +81,7 @@ async function call(pathname, method = 'POST', body) {
   return { status: response.status, headers: response.headers, json, text, bytes: response }
 }
 
-check(routes.size === 16, 'expected 16 registered routes, got ' + routes.size)
+check(routes.size === 19, 'expected 19 registered routes, got ' + routes.size)
 
 // state
 const state0 = await call('/api/kanban.state', 'GET')
@@ -186,14 +186,27 @@ check((await reopened.workspaceBoards([{ id: ws.id, title: ws.title }]))[0].boar
 await reopened.close()
 check((await call('/api/kanban.board.rename', 'POST', { boardId, title: '  ' })).status === 400, 'blank rename accepted')
 check((await call('/api/kanban.board.rename', 'POST', { boardId: 'missing', title: 'X' })).status === 404, 'unknown board accepted')
+check((await call('/api/kanban.board.bind', 'POST', { boardId, workspaceId: 'missing' })).status === 404, 'binding to an unknown workspace accepted')
+const reordered = await call('/api/kanban.board.move', 'POST', { boardId, beforeId: 'ws-a' })
+check(reordered.status === 200 && reordered.json.boardOrder[0] === boardId, 'board ordering failed')
+check((await call('/api/kanban.board.move', 'POST', { boardId, beforeId: 'missing' })).status === 404, 'ordering before an unknown board accepted')
 const bound = await call('/api/kanban.board.bind', 'POST', { boardId, workspaceId: 'ws-b' })
 check(bound.status === 200 && bound.json.migrated === 1, 'board bind failed: ' + bound.text)
 const stateAfterBind = await call('/api/kanban.state', 'GET')
 check(stateAfterBind.json.boards.length === 0, 'bound board was not removed')
 check(stateAfterBind.json.tasks.some((item) => item.workspaceId === 'ws-b' && item.title === 'Board task'), 'board task was not migrated')
+check(bound.json.boardOrder[0] === 'ws-b', 'binding lost board order')
+await call('/api/kanban.task.link', 'POST', { id: boardTask.json.task.id, sessionId: 'session-bound' })
+const unbound = await call('/api/kanban.board.unbind', 'POST', { boardId: 'ws-b' })
+check(unbound.status === 200 && unbound.json.board.title === 'Renamed', 'board unbind lost name')
+check(unbound.json.tasks.some((task) => task.id === boardTask.json.task.id && task.workspaceId === unbound.json.board.id && task.sessionId === null), 'unbinding lost task or retained a stale session link')
+check((await call('/api/kanban.board.unbind', 'POST', { boardId: unbound.json.board.id })).status === 404, 'unbinding a standalone board accepted')
 await call('/api/kanban.task.delete', 'POST', { id: boardTask.json.task.id })
 
 // delete
+const groupMove = await call('/api/kanban.task.moveMany', 'POST', { ids: [task.id, duplicate.json.task.id], status: 'doing' })
+check(groupMove.status === 200 && groupMove.json.tasks.filter((item) => [task.id, duplicate.json.task.id].includes(item.id)).every((item) => item.status === 'doing'), 'batch task move failed')
+check((await call('/api/kanban.task.moveMany', 'POST', { ids: [], status: 'done' })).status === 400, 'empty batch selection accepted')
 const view = await call('/api/kanban.task.delete', 'POST', { id: duplicate.json.task.id })
 check(view.status === 200 && view.json.ok === true, 'delete failed')
 const finalState = await call('/api/kanban.state', 'GET')

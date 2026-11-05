@@ -10,6 +10,11 @@ addDict({
   'home.searchBoards': '搜索看板',
   'home.noResults': '没有匹配的看板',
   'home.retry': '重新加载',
+  'home.reorderHint': '拖动卡片排序，也可使用卡片上的前移 / 后移按钮。',
+  'home.moveEarlier': '前移',
+  'home.moveLater': '后移',
+  'home.orderSaving': '正在保存看板顺序…',
+  'home.orderSaved': '看板顺序已保存',
   'heat.title': '完成记录',
   'heat.subtitle': '最近一年 · 每日完成任务数',
   'heat.total': '共完成 {count} 项',
@@ -50,6 +55,11 @@ addDict({
   'home.searchBoards': 'Search boards',
   'home.noResults': 'No matching boards',
   'home.retry': 'Reload',
+  'home.reorderHint': 'Drag cards to reorder, or use each card’s move earlier / later buttons.',
+  'home.moveEarlier': 'Move earlier',
+  'home.moveLater': 'Move later',
+  'home.orderSaving': 'Saving board order…',
+  'home.orderSaved': 'Board order saved',
   'heat.title': 'Completions',
   'heat.subtitle': 'Past year · tasks completed each day',
   'heat.total': '{count} completions',
@@ -297,6 +307,14 @@ function WorkboardHome({ state }) {
   const store = kanbanStore
   const [query, setQuery] = useState('')
   const [newBoard, setNewBoard] = useState(false)
+  const [dragId, setDragId] = useState(null)
+  const [previewOrder, setPreviewOrder] = useState(null)
+  const previewOrderRef = useRef(null)
+  const [orderBusy, setOrderBusy] = useState(false)
+  const [orderMessage, setOrderMessage] = useState('')
+  const moving = useRef(false)
+  const dragRef = useRef(null)
+  const ignoreClickUntil = useRef(0)
   const boards = boardsOf(state)
   const visible = boards.filter((board) => (board.title + ' ' + board.path).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
   const stats = useMemo(() => {
@@ -308,6 +326,49 @@ function WorkboardHome({ state }) {
     }
     return result
   }, [state.tasks])
+
+  async function moveBoard(id, beforeId) {
+    if (moving.current || id === beforeId || state.status !== 'ready') return
+    moving.current = true
+    setOrderBusy(true)
+    setOrderMessage(t('home.orderSaving'))
+    try {
+      await store.moveBoard(id, beforeId)
+      setOrderMessage(t('home.orderSaved'))
+    } catch (failure) {
+      setOrderMessage('')
+      store.toast(t('toast.failed', { message: messageOf(failure) }), 'error')
+    } finally {
+      moving.current = false
+      setOrderBusy(false)
+      previewOrderRef.current = null
+      setPreviewOrder(null)
+    }
+  }
+
+  function endDrag(clearPreview = true) {
+    dragRef.current = null
+    setDragId(null)
+    if (clearPreview) {
+      previewOrderRef.current = null
+      setPreviewOrder(null)
+    }
+    ignoreClickUntil.current = Date.now() + 250
+  }
+
+  function previewBoard(targetId) {
+    const id = dragRef.current
+    if (!id) return
+    // Wait for native dragover before hiding the source or moving grid items.
+    setDragId(id)
+    if (id === targetId) return
+    const order = previewOrderRef.current || boards.map((board) => board.id)
+    const target = order.indexOf(targetId)
+    const next = order.filter((entry) => entry !== id)
+    next.splice(target, 0, id)
+    previewOrderRef.current = next
+    setPreviewOrder(next)
+  }
   return h('div', { className: 'kbn-root' },
     h('div', { className: 'kbn-home', 'data-workboard-view': 'home' },
       h('header', { className: 'kbn-home-head' },
@@ -328,13 +389,48 @@ function WorkboardHome({ state }) {
               h('div', { className: 'kbn-home-section-head' },
                 h('div', { className: 'kbn-home-section-title' }, h('h2', { id: 'kbn-boards-title' }, t('home.boards')), h('span', { className: 'kbn-home-count' }, t('home.boardCount', { count: boards.length }))),
                 h(DshUI.Input, { className: 'kbn-home-search', value: query, onChange: (event) => setQuery(event.currentTarget.value), placeholder: t('home.searchBoards'), 'aria-label': t('home.searchBoards'), icon: h(DshUI.IconSearchOutlineRegular, { size: 16 }) })),
-              visible.length ? h('div', { className: 'kbn-home-boards' }, visible.map((board) => {
+              visible.length ? h('div', { className: 'kbn-home-boards', 'aria-busy': orderBusy }, visible.map((board, index) => {
                 const counts = stats.get(board.id) || { todo: 0, doing: 0, done: 0 }
-                return h(DshUI.Button, { key: board.id, variant: 'outline', className: 'kbn-home-board', 'data-board-id': board.id, onClick: () => store.openBoard(board.id) },
-                  h('span', { className: 'kbn-home-board-title' }, h(DshUI.IconFlatListOutlineRegular, { size: 18 }), h('span', null, board.title), h(DshUI.IconChevronRightOutlineRegular, { size: 16 })),
+                const later = visible[index + 1]
+                const afterLater = later ? boards[boards.findIndex((entry) => entry.id === later.id) + 1]?.id || null : null
+                return h('div', {
+                  key: board.id, className: 'kbn-home-board-slot', draggable: !orderBusy && state.status === 'ready',
+                  'data-dragging': dragId === board.id,
+                  style: { order: previewOrder ? previewOrder.indexOf(board.id) : index },
+                  onDragStart: (event) => {
+                    if (moving.current || event.target.closest?.('.kbn-home-board-moves')) { event.preventDefault(); return }
+                    dragRef.current = board.id
+                    previewOrderRef.current = boards.map((entry) => entry.id)
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', board.id)
+                  },
+                  onDragEnd: () => endDrag(!moving.current),
+                  onDragOver: (event) => {
+                    if (!dragRef.current) return
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                    previewBoard(board.id)
+                  },
+                  onDrop: (event) => {
+                    if (!dragRef.current) return
+                    event.preventDefault()
+                    const id = dragRef.current
+                    const order = previewOrderRef.current || boards.map((entry) => entry.id)
+                    const before = order[order.indexOf(id) + 1] || null
+                    endDrag(false)
+                    moveBoard(id, before)
+                  },
+                }, h(DshUI.Button, { variant: 'outline', className: 'kbn-home-board', 'data-board-id': board.id, onClick: () => {
+                  if (!dragRef.current && Date.now() >= ignoreClickUntil.current) store.openBoard(board.id)
+                } },
+                  h('span', { className: 'kbn-home-board-title' }, h(DshUI.IconFlatListOutlineRegular, { size: 18 }), h('span', null, board.title)),
                   h('span', { className: 'kbn-home-board-path', title: board.path || t('home.unbound') }, board.path || t('home.unbound')),
-                  h('span', { className: 'kbn-home-board-counts' }, STATUSES.map((status) => h('span', { key: status }, h('i', { 'data-status': status, 'aria-hidden': true }), t('status.' + status), h('strong', null, counts[status])))))
-              })) : h('div', { className: 'kbn-home-empty' }, h('h3', null, t(query ? 'home.noResults' : 'home.empty')), !query ? h('p', null, t('home.emptyHint')) : null)),
+                  h('span', { className: 'kbn-home-board-counts' }, STATUSES.map((status) => h('span', { key: status }, h('i', { 'data-status': status, 'aria-hidden': true }), t('status.' + status), h('strong', null, counts[status]))))),
+                  h('div', { className: 'kbn-home-board-moves' },
+                    h(DshUI.Button, { variant: 'ghost', size: 'sm', draggable: false, disabled: orderBusy || state.status !== 'ready' || index === 0, title: t('home.moveEarlier'), 'aria-label': t('home.moveEarlier') + ' · ' + board.title, onClick: () => moveBoard(board.id, visible[index - 1].id) }, h(DshUI.IconChevronLeftOutlineRegular, { size: 14 })),
+                    h(DshUI.Button, { variant: 'ghost', size: 'sm', draggable: false, disabled: orderBusy || state.status !== 'ready' || !later, title: t('home.moveLater'), 'aria-label': t('home.moveLater') + ' · ' + board.title, onClick: () => moveBoard(board.id, afterLater) }, h(DshUI.IconChevronRightOutlineRegular, { size: 14 }))))
+              })) : h('div', { className: 'kbn-home-empty' }, h('h3', null, t(query ? 'home.noResults' : 'home.empty')), !query ? h('p', null, t('home.emptyHint')) : null),
+              boards.length > 1 && h('p', { className: 'kbn-home-order-hint', role: 'status', 'aria-live': 'polite' }, orderMessage || t('home.reorderHint'))),
             h(IdeasSection, { state })))),
     h(NewBoardDialog, { open: newBoard, onClose: (board) => { setNewBoard(false); if (board) store.openBoard(board.id) } }),
     state.toast ? h(DshUI.Toast, { key: state.toast.id, text: state.toast.message, holdMs: 4000, onDone: () => undefined }) : null)
@@ -366,6 +462,15 @@ addStyle(`
 .kbn-home-count{color:var(--dsw-alias-label-secondary);font-size:12px;white-space:nowrap}
 .kbn-home-search{width:200px;max-width:100%}
 .kbn-home-boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:14px}
+.kbn-home-board-slot{position:relative;min-width:0;border-radius:var(--dsw-radius-lg)}
+.kbn-home-board-slot[draggable=true]{cursor:grab}
+.kbn-home-board-slot[data-dragging=true]{outline:1.5px dashed var(--dsw-alias-state-business-primary);outline-offset:-1.5px;background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 6%,transparent);cursor:grabbing}
+.kbn-home-board-slot[data-dragging=true]>*{visibility:hidden}
+.kbn-home-board-slot>.kbn-home-board{width:100%;height:100%!important}
+.kbn-home-board-slot .kbn-home-board-title{padding-inline-end:58px}
+.kbn-home-board-moves{position:absolute;inset-block-start:12px;inset-inline-end:10px;display:flex;gap:2px}
+.kbn-home-board-moves>button{display:inline-flex;align-items:center;justify-content:center;width:28px!important;min-width:28px!important;height:28px!important;padding:0!important}
+.kbn-home-order-hint{margin-top:10px!important;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .kbn-home-board{display:flex!important;flex-direction:column;align-items:stretch!important;justify-content:flex-start!important;gap:10px!important;height:auto!important;min-width:0;white-space:normal!important;text-align:start;padding:18px!important;border-radius:var(--dsw-radius-lg)!important}
 .kbn-home-board-title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:550;min-width:0}
 .kbn-home-board-title>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

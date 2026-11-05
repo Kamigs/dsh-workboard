@@ -154,6 +154,7 @@ function KbnAccountAvatar({ profile, size = 32, className }) {
     className: cx('kbn-account-avatar', className),
     src: profile.avatarUrl,
     alt: '',
+    draggable: false,
     width: px,
     height: px,
     style: box,

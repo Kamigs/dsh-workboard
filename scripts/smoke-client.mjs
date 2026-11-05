@@ -243,6 +243,7 @@ const tasks = [
 
 const fetchCalls = []
 let hostTasks = tasks.slice()
+let hostBoardOrder = []
 function taskFrom(id, patch) {
   const existing = hostTasks.find((task) => task.id === id) || Object.assign({}, baseTask, { id })
   return Object.assign({}, existing, patch)
@@ -266,9 +267,15 @@ async function fakeFetch(url, init) {
       ? Object.assign({}, item, { workspaceId: payload.workspaceId })
       : item))
     hostBoards = hostBoards.filter((board) => board.id !== payload.boardId)
-    body = { ok: true, boardId: payload.boardId, workspaceId: payload.workspaceId, migrated: 1 }
+    body = { ok: true, boardId: payload.boardId, workspaceId: payload.workspaceId, migrated: 1, workspaces: hostWorkspaces, boards: hostBoards, tasks: hostTasks }
+  } else if (path.endsWith('/api/kanban.board.move')) {
+    const ids = [...hostWorkspaces, ...hostBoards].map((board) => board.id)
+    const order = [...hostBoardOrder, ...ids.filter((id) => !hostBoardOrder.includes(id))].filter((id) => id !== payload.boardId)
+    order.splice(payload.beforeId == null ? order.length : order.indexOf(payload.beforeId), 0, payload.boardId)
+    hostBoardOrder = order
+    body = { ok: true, boardOrder: order }
   } else if (path.endsWith('/api/kanban.state')) {
-    body = { ok: true, workspaces: hostWorkspaces, boards: hostBoards, tasks: hostTasks }
+    body = { ok: true, workspaces: hostWorkspaces, boards: hostBoards, boardOrder: hostBoardOrder, tasks: hostTasks }
   } else if (path.endsWith('/api/kanban.task.create')) {
     const task = taskFrom('task_new', Object.assign({ workspaceId: payload.workspaceId }, payload.input))
     hostTasks = hostTasks.concat([task])
@@ -567,6 +574,28 @@ const home = render(mainEntry.component, {})
 check(home.includes('kbn-heat-grid') && home.includes('灵感便签'), 'home must show heatmap and ideas')
 check(home.includes('Sprint board') && home.includes('web-app'), 'home must include all boards')
 check(!home.includes('kbn-workbench'), 'sidebar must land on home, not remembered board details')
+// Both drag/drop and keyboard-accessible buttons must save through the host.
+const reorderButtons = renderedElements.filter((node) => node.props['aria-label']?.startsWith('前移'))
+await reorderButtons.at(-1).props.onClick()
+let reorderedHome = render(mainEntry.component, {})
+check(reorderedHome.indexOf('data-board-id="board_unbound"') < reorderedHome.indexOf('data-board-id="ws-b"'), 'move-earlier button did not reorder home cards')
+const slots = renderedElements.filter((node) => node.props.className === 'kbn-home-board-slot')
+const transfer = { setData() {} }
+slots[1].props.onDragStart({ target: { closest: () => null }, dataTransfer: transfer })
+renderedElements.length = 0
+renderNode(React.createElement(mainEntry.component, {}))
+check(renderedElements.filter((node) => node.props.className === 'kbn-home-board-slot').every((node) => !node.props['data-dragging']),
+  'home dragstart must keep the source visible until native dragging has started')
+slots[0].props.onDragOver({ preventDefault() {}, dataTransfer: transfer })
+renderedElements.length = 0
+renderNode(React.createElement(mainEntry.component, {}))
+const previewSlots = renderedElements.filter((node) => node.props.className === 'kbn-home-board-slot')
+check(previewSlots[1].props.style.order === 0 && previewSlots[0].props.style.order === 1, 'home cards must yield their positions during drag')
+await slots[0].props.onDrop({ preventDefault() {}, currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 100 }) }, clientY: 10 })
+await new Promise((resolve) => setTimeout(resolve, 0))
+check(hostBoardOrder[0] === 'board_unbound', 'drag/drop did not save home board order')
+await sandbox.__KANBAN_TEST__.getStore().moveBoard('ws-a', 'board_unbound')
+render(mainEntry.component, {})
 const homeCard = renderedElements.find((node) => node.props['data-board-id'] === 'ws-a')
 homeCard.props.onClick()
 const boardOne = render(mainEntry.component, {})
@@ -581,6 +610,75 @@ check(boardTwo.includes('kbn-card'), 'card class missing from board markup')
 check(boardTwo.includes('kbn-col'), 'column class missing from board markup')
 check(boardOne !== null, 'first board render returned nothing')
 
+// Keyboard-modified selection uses visible column/card order without extra UI.
+function rerenderSelection() {
+  renderedElements.length = 0
+  return renderNode(React.createElement(mainEntry.component, {}))
+}
+function selectCard(id, modifiers = {}) {
+  renderedElements.find((node) => node.type === 'article' && node.props['data-task-id'] === id).props.onClick(modifiers)
+  return rerenderSelection()
+}
+function selectedCardIds() {
+  return renderedElements.filter((node) => node.type === 'article' && node.props['aria-pressed'])
+    .map((node) => node.props['data-task-id']).join(',')
+}
+selectCard('task_4')
+selectCard('task_2', { ctrlKey: true })
+check(selectedCardIds() === 'task_4,task_2', 'Ctrl-click must add a nonadjacent card to the selection')
+selectCard('task_4', { metaKey: true })
+check(selectedCardIds() === 'task_2', 'Cmd-click must remove an already selected card')
+let controlMenuPrevented = false
+renderedElements.find((node) => node.type === 'article' && node.props['data-task-id'] === 'task_4').props.onContextMenu({
+  ctrlKey: true, target: { closest: () => null },
+  preventDefault() { controlMenuPrevented = true }, stopPropagation() {},
+})
+rerenderSelection()
+check(controlMenuPrevented && selectedCardIds() === 'task_4,task_2', 'macOS Control-click must select instead of opening a context menu')
+selectCard('task_4')
+selectCard('task_2', { shiftKey: true })
+check(selectedCardIds() === 'task_4,task_1,task_2', 'Shift-click must select the visible range across columns')
+selectCard('task_1', { shiftKey: true })
+check(selectedCardIds() === 'task_4,task_1', 'Shift-click must retain its anchor when shrinking the range')
+selectCard('task_2')
+selectCard('task_4', { ctrlKey: true })
+const selectionMarkup = selectCard('task_1', { ctrlKey: true, shiftKey: true })
+check(selectedCardIds() === 'task_4,task_1,task_2', 'Ctrl-Shift-click must add a range without removing other selections')
+check(!selectionMarkup.includes('kbn-card-checkbox') && !selectionMarkup.includes('kbn-selection-bar') && !selectionMarkup.includes('多选'),
+  'selection must not introduce checkboxes, a toolbar, a multi-select button or instruction text')
+selectCard('task_1')
+check(selectedCardIds() === 'task_1', 'plain click must replace a multi-selection with the clicked card')
+renderedElements.find((node) => node.props.className === 'kbn-board').props.onKeyDown({ key: 'Escape', preventDefault() {} })
+rerenderSelection()
+check(selectedCardIds() === '', 'Escape must clear card selection')
+
+// Exercise native drag startup separately from dragover. Collapsing the source
+// in dragstart can abort the desktop drag before it reaches a destination.
+const draggedCard = renderedElements.find((node) => node.type === 'article' && node.props['data-task-id'] === 'task_1')
+const dragData = new Map()
+const dragEvent = {
+  currentTarget: { getBoundingClientRect: () => ({ width: 300, height: 128 }) },
+  dataTransfer: { setData: (type, value) => dragData.set(type, value) },
+  preventDefault() {}, stopPropagation() {},
+}
+const rerenderDrag = () => {
+  renderedElements.length = 0
+  return renderNode(React.createElement(mainEntry.component, {}))
+}
+draggedCard.props.onDragStart(dragEvent)
+let dragMarkup = rerenderDrag()
+check(dragData.get('text/plain') === 'task_1', 'dragstart must provide the native task payload')
+check(!dragMarkup.includes('data-drag-source="true"') && !dragMarkup.includes('kbn-drop-placeholder'),
+  'dragstart must leave the source layout intact for the native preview')
+renderedElements.find((node) => node.props.className === 'kbn-col-body').props.onDragOver(dragEvent)
+dragMarkup = rerenderDrag()
+check(dragMarkup.includes('data-drag-source="true"') && dragMarkup.includes('kbn-drop-placeholder') && dragMarkup.includes('height:128px'),
+  'dragover must reserve the full source height and make the target cards give way')
+draggedCard.props.onDragEnd()
+dragMarkup = rerenderDrag()
+check(!dragMarkup.includes('data-drag-source="true"') && !dragMarkup.includes('kbn-drop-placeholder'),
+  'ending or cancelling the drag must restore the source and remove the placeholder')
+
 const boardSwitcher = renderedElements.find((node) => node.props.className === 'kbn-board-switcher-button')
 check(boardTwo.includes('<h1') && boardSwitcher?.props['aria-haspopup'] === 'menu',
   'the board title should be the switcher')
@@ -592,12 +690,23 @@ boardSwitcher.props.onClick()
 renderedElements.length = 0
 renderNode(React.createElement(mainEntry.component, {}))
 
-const addBoardButtons = renderedElements.filter((node) => node.type === 'button'
-  && (node.props['aria-label'] === '新建看板' || renderNode(node.props.children).includes('新建看板')))
-if (addBoardButtons.length !== 1) throw new Error('the populated board should have just one New board button')
-addBoardButtons[0].props.onClick()
+const bindingButton = renderedElements.find((node) => node.props['aria-label'] === '管理工作区绑定')
+check(!!bindingButton, 'board details need an explicit workspace-binding entry')
+bindingButton.props.onClick()
+renderedElements.length = 0
+const bindingDialog = renderNode(React.createElement(mainEntry.component, {}))
+check(bindingDialog.includes('解绑工作区') && bindingDialog.includes('任务上的会话关联会解除'), 'unbind dialog must explain its effect on task links')
+renderedElements.find((node) => node.type === 'button' && renderNode(node.props.children) === '取消').props.onClick()
+renderedElements.length = 0
+renderNode(React.createElement(mainEntry.component, {}))
+
+const addTaskButtons = renderedElements.filter((node) => node.type === 'button'
+  && (node.props['aria-label'] === '新建任务' || renderNode(node.props.children).includes('新建任务')))
+if (addTaskButtons.length !== 1) throw new Error('the populated board should have just one New task button')
+addTaskButtons[0].props.onClick()
 const afterAddClick = renderNode(React.createElement(mainEntry.component, {}))
-check(afterAddClick.includes('kbn-project-dialog'), 'the header New board button must open the new-board form')
+check(afterAddClick.includes('kbn-editor'), 'the header New task button must open the task editor')
+check(!afterAddClick.includes('kbn-project-dialog'), 'creating a task must not open the board form')
 
 // Session header link renders for a linked session and hides for an unrelated one.
 const linked = render(linkEntry.component, { sessionId: 'session-abc' })
@@ -629,8 +738,8 @@ check(editorRegistration !== undefined, 'main registration missing')
 // so verify the registered components at least render while closed.
 check(boardTwo.includes('kbn-head'), 'board header missing')
 check(boardTwo.includes('kbn-workbench'), 'workbench layout missing')
-check(boardTwo.includes('新建看板'), 'the header must offer creating a board')
-check(boardTwo.lastIndexOf('新建看板') > boardTwo.indexOf('工作看板设置'), 'the create-board button must be the rightmost header action')
+check(boardTwo.includes('新建任务'), 'the header must offer creating a task')
+check(boardTwo.lastIndexOf('新建任务') > boardTwo.indexOf('工作看板设置'), 'the create-task button must be the rightmost header action')
 check(boardTwo.includes('kbn-detail'), 'right-hand detail pane missing')
 check(boardTwo.includes('data-status="todo"') || boardTwo.includes('data-status=todo'), 'To do column missing')
 check(boardTwo.includes('data-status="doing"') || boardTwo.includes('data-status=doing'), 'Doing column missing')
@@ -925,6 +1034,8 @@ check(test.currentDetailWidth() === 380, 'a remembered detail width must be rest
   check(humanCard.includes('kbn-account-avatar'), 'the human card must show the account avatar')
   check(humanCard.includes('https://example.com/avatar.png'), 'the human card avatar URL is wrong')
   check(humanCard.includes('Kamigs'), 'the human card must show the account name')
+  check(renderedElements.find((node) => node.type === 'img' && node.props.className === 'kbn-account-avatar')?.props.draggable === false,
+    'the avatar must not start its own image drag instead of dragging the card')
   const doneCard = render(test.TaskCard, {
     task: tasks[1], workspace: workspaceA, selected: false, busy: false,
     onEdit() {}, onRun() {}, onOpenSession() {}, onArchive() {}, onDelete() {},

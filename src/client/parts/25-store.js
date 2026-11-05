@@ -21,9 +21,12 @@ const KANBAN_API_PATHS = {
   boardCreate: '/api/kanban.board.create',
   boardRename: '/api/kanban.board.rename',
   boardBind: '/api/kanban.board.bind',
+  boardUnbind: '/api/kanban.board.unbind',
+  boardMove: '/api/kanban.board.move',
   create: '/api/kanban.task.create',
   update: '/api/kanban.task.update',
   move: '/api/kanban.task.move',
+  moveMany: '/api/kanban.task.moveMany',
   archive: '/api/kanban.task.archive',
   restore: '/api/kanban.task.restore',
   delete: '/api/kanban.task.delete',
@@ -44,6 +47,7 @@ function kanbanEmptySnapshot() {
     status: 'idle',
     workspaces: [],
     boards: [],
+    boardOrder: [],
     tasks: [],
     notes: [],
     completions: [],
@@ -191,6 +195,7 @@ function createKanbanStore(ctx) {
         status: 'ready',
         workspaces: body !== null && Array.isArray(body.workspaces) ? body.workspaces : [],
         boards: body !== null && Array.isArray(body.boards) ? body.boards : [],
+        boardOrder: Array.isArray(body?.boardOrder) ? body.boardOrder : [],
         tasks: body !== null && Array.isArray(body.tasks) ? body.tasks : [],
         notes: Array.isArray(body?.notes) ? body.notes : [],
         completions: Array.isArray(body?.completions) ? body.completions : [],
@@ -261,6 +266,12 @@ function createKanbanStore(ctx) {
     const tasks = body !== null && Array.isArray(body.tasks) ? body.tasks : null
     if (tasks === null) throw new Error(t('api.badResponse'))
     commit({ tasks, completions: body.completions || snapshot.completions })
+  }
+
+  async function moveTasks(ids, status, beforeId) {
+    const body = await apiPost(KANBAN_API_PATHS.moveMany, { ids, status, beforeId })
+    if (!Array.isArray(body?.tasks)) throw new Error(t('api.badResponse'))
+    commit({ tasks: body.tasks, completions: body.completions || snapshot.completions })
   }
 
   /** Archive or restore only the specified board task, preserving its session link. */
@@ -351,11 +362,37 @@ function createKanbanStore(ctx) {
    * @returns {Promise<void>}
    */
   async function bindBoard(boardId, workspaceId) {
-    await apiPost(KANBAN_API_PATHS.boardBind, { boardId, workspaceId })
-    // Migrate the selected identity before refreshing away the standalone board.
-    if (kbnLastWorkspaceId === boardId) kbnRememberBoard(workspaceId)
-    if (snapshot.boardId === boardId) setSnapshot({ boardId: workspaceId })
-    await refresh()
+    const body = await apiPost(KANBAN_API_PATHS.boardBind, { boardId, workspaceId })
+    applyBoardState(body, boardId, workspaceId)
+    return workspaceId
+  }
+
+  function applyBoardState(body, previousId, nextId) {
+    if (!Array.isArray(body?.boards) || !Array.isArray(body?.workspaces) || !Array.isArray(body?.tasks)) {
+      throw new Error(t('api.badResponse'))
+    }
+    ++refreshToken
+    if (kbnLastWorkspaceId === previousId) kbnRememberBoard(nextId)
+    commit({
+      boards: body.boards, workspaces: body.workspaces, tasks: body.tasks,
+      boardOrder: Array.isArray(body.boardOrder) ? body.boardOrder : [],
+      boardId: snapshot.boardId === previousId ? nextId : snapshot.boardId,
+      status: 'ready', error: null,
+    })
+  }
+
+  async function unbindBoard(boardId) {
+    const body = await apiPost(KANBAN_API_PATHS.boardUnbind, { boardId })
+    if (typeof body?.board?.id !== 'string') throw new Error(t('api.badResponse'))
+    applyBoardState(body, boardId, body.board.id)
+    return body.board
+  }
+
+  async function moveBoard(boardId, beforeId) {
+    const body = await apiPost(KANBAN_API_PATHS.boardMove, { boardId, beforeId })
+    if (!Array.isArray(body?.boardOrder)) throw new Error(t('api.badResponse'))
+    ++refreshToken
+    commit({ boardOrder: body.boardOrder, status: 'ready' })
   }
 
   async function uploadAttachment(file, workspaceId) {
@@ -538,12 +575,15 @@ function createKanbanStore(ctx) {
     createTask,
     updateTask,
     moveTask,
+    moveTasks,
     archiveTask: (id) => setTaskArchived(id, true),
     restoreTask: (id) => setTaskArchived(id, false),
     deleteTask,
     linkSession,
     createBoard,
     bindBoard,
+    unbindBoard,
+    moveBoard,
     renameBoard,
     uploadAttachment,
     attachmentUrl,
@@ -660,7 +700,8 @@ function boardsOf(snapshot) {
       })
     }
   }
-  return boards
+  const rank = new Map((snapshot?.boardOrder || []).map((id, index) => [id, index]))
+  return boards.sort((left, right) => (rank.get(left.id) ?? Infinity) - (rank.get(right.id) ?? Infinity))
 }
 
 /**

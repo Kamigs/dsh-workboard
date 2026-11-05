@@ -140,18 +140,20 @@ function guard(store, handler) {
  * @returns {void}
  */
 export function registerKanbanRoutes(ctx, store) {
+  const state = async () => ({
+    ok: true,
+    workspaces: await store.workspaceBoards(listWorkspaces(ctx)),
+    boards: await store.listBoards(),
+    boardOrder: await store.getBoardOrder(),
+    tasks: await store.list(),
+    ...await store.homeData(),
+  })
   /** @type {Array<{ path: string, methods: string[], handler: (request: Request) => Promise<Response> }>} */
   const routes = [
     {
       path: '/api/kanban.state',
       methods: ['GET'],
-      handler: guard(store, async () => jsonResponse({
-        ok: true,
-        workspaces: await store.workspaceBoards(listWorkspaces(ctx)),
-        boards: await store.listBoards(),
-        tasks: await store.list(),
-        ...await store.homeData(),
-      })),
+      handler: guard(store, async () => jsonResponse(await state())),
     },
     {
       path: '/api/kanban.note.create', methods: ['POST'],
@@ -199,8 +201,29 @@ export function registerKanbanRoutes(ctx, store) {
       methods: ['POST'],
       handler: guard(store, async (request) => {
         const body = await readJsonObject(request)
+        if (!listWorkspaces(ctx).some((workspace) => workspace.id === body.workspaceId)) {
+          throw kanbanError('kanban/workspace-not-found', 'Workspace not found. Refresh and try again.')
+        }
         const result = await store.bindBoard(body.boardId, body.workspaceId)
-        return jsonResponse({ ok: true, boardId: result.boardId, workspaceId: result.workspaceId, migrated: result.migrated })
+        return jsonResponse({ ...await state(), ...result })
+      }),
+    },
+    {
+      path: '/api/kanban.board.unbind', methods: ['POST'],
+      handler: guard(store, async (request) => {
+        const body = await readJsonObject(request)
+        const workspace = listWorkspaces(ctx).find((item) => item.id === body.boardId)
+        if (!workspace) throw kanbanError('kanban/board-not-found', 'Workspace board not found.')
+        const result = await store.unbindBoard(workspace)
+        return jsonResponse({ ...await state(), ...result })
+      }),
+    },
+    {
+      path: '/api/kanban.board.move', methods: ['POST'],
+      handler: guard(store, async (request) => {
+        const body = await readJsonObject(request)
+        const boardOrder = await store.moveBoard(body.boardId, body.beforeId, listWorkspaces(ctx).map((ws) => ws.id))
+        return jsonResponse({ ok: true, boardOrder })
       }),
     },
     {
@@ -227,6 +250,15 @@ export function registerKanbanRoutes(ctx, store) {
       handler: guard(store, async (request) => {
         const body = await readJsonObject(request)
         const tasks = await store.move(body.id, body.status, body.beforeId)
+        return jsonResponse({ ok: true, tasks, completions: (await store.homeData()).completions })
+      }),
+    },
+    {
+      path: '/api/kanban.task.moveMany',
+      methods: ['POST'],
+      handler: guard(store, async (request) => {
+        const body = await readJsonObject(request)
+        const tasks = await store.moveMany(body.ids, body.status, body.beforeId)
         return jsonResponse({ ok: true, tasks, completions: (await store.homeData()).completions })
       }),
     },

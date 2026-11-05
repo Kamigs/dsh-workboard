@@ -392,6 +392,47 @@ test('standalone boards can be created and bound to a workspace', async () => {
   })
 })
 
+test('batch moves keep visual order, leave the anchor status alone and record only new completions', async () => {
+  await withStore(async (store, dir) => {
+    const first = await store.create('ws-1', { title: 'First' })
+    const second = await store.create('ws-1', { title: 'Second' })
+    const doing = await store.create('ws-1', { title: 'Doing', status: 'doing' })
+    const anchor = await store.create('ws-1', { title: 'Anchor', status: 'done' })
+    const ids = [doing.id, second.id, first.id]
+    const moved = await store.moveMany(ids, 'done', anchor.id)
+    assert.deepEqual(moved.filter((task) => task.status === 'done').sort((a, b) => a.order - b.order).map((task) => task.id), [first.id, second.id, doing.id, anchor.id])
+    assert.equal(moved.find((task) => task.id === anchor.id).status, 'done')
+    const history = (await store.homeData()).completions
+    assert.equal(history.length, 4)
+    await store.moveMany(ids, 'done', anchor.id)
+    assert.deepEqual((await store.homeData()).completions, history)
+    const reopened = createStore({ dataDir: dir })
+    try { assert.deepEqual(await reopened.list(), await store.list()) } finally { await reopened.close() }
+  })
+})
+
+test('invalid or failed batch moves publish no partial task or completion changes', async () => {
+  await withStore(async (store, dir) => {
+    const first = await store.create('ws-1', { title: 'First' })
+    const second = await store.create('ws-1', { title: 'Second' })
+    const foreign = await store.create('ws-2', { title: 'Other board' })
+    const archived = await store.create('ws-1', { title: 'Archived' })
+    await store.archive(archived.id)
+    const before = await store.list()
+    for (const ids of [[], [first.id, first.id], [first.id, 'missing'], [first.id, foreign.id], [first.id, archived.id]]) {
+      await assert.rejects(store.moveMany(ids, 'done'))
+      assert.deepEqual(await store.list(), before)
+    }
+    await assert.rejects(store.moveMany([first.id, second.id], 'done', foreign.id))
+    store.stateFile = dir
+    try {
+      await assert.rejects(store.moveMany([first.id, second.id], 'done'))
+      assert.deepEqual(await store.list(), before)
+      assert.deepEqual((await store.homeData()).completions, [])
+    } finally { store.stateFile = join(dir, 'state.json') }
+  })
+})
+
 test('a corrupt state file is quarantined and the store starts empty', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-workboard-store-'))
   try {

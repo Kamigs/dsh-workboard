@@ -10,7 +10,6 @@ addDict(
     'board.newBoard': '新建看板',
     'board.resizeDetail': '拖动调整任务详情宽度',
     'board.newTask': '新建任务',
-    'board.addToColumn': '在「{status}」中新建任务',
     'board.emptyColumn': '暂无任务',
     'board.noBoardTitle': '还没有看板',
     'board.noBoardDesc': '新建一个看板开始，不需要先绑定工作目录；第一次把 AI 任务发送到会话时再选择目录。',
@@ -49,6 +48,17 @@ addDict(
     'board.createAction': '创建',
     'board.created': '看板「{title}」已创建',
     'board.dirLaterHint': '工作目录会在第一次把 AI 任务发送到会话时再选择。',
+    'binding.open': '管理工作区绑定',
+    'binding.bind': '绑定工作区',
+    'binding.unbind': '解绑工作区',
+    'binding.current': '已绑定：{title}',
+    'binding.select': '选择工作区',
+    'binding.placeholder': '请选择工作区',
+    'binding.directory': '选择其他目录…',
+    'binding.hint': '任务将移入所选工作区的看板，保留当前看板名称；目标看板已有的任务会合并保留。',
+    'binding.detachHint': '任务和附件会保留在独立看板中，任务上的会话关联会解除。原工作区、会话和文件不受影响，主页仍会显示该工作区的空看板。',
+    'binding.saved': '工作区已绑定',
+    'binding.detached': '工作区已解绑，任务已保留在独立看板中',
   },
   {
     'board.subtitle': '{todo} to do · {doing} in progress · {done} done',
@@ -57,7 +67,6 @@ addDict(
     'board.newBoard': 'New board',
     'board.resizeDetail': 'Drag to resize the task details',
     'board.newTask': 'New task',
-    'board.addToColumn': 'Add task to {status}',
     'board.emptyColumn': 'No tasks',
     'board.noBoardTitle': 'No boards yet',
     'board.noBoardDesc': 'Create a board to begin — no directory needed. The directory is picked the first time an AI task runs in a session.',
@@ -96,6 +105,17 @@ addDict(
     'board.createAction': 'Create',
     'board.created': 'Board "{title}" created',
     'board.dirLaterHint': 'The working directory is chosen the first time an AI task runs in a session.',
+    'binding.open': 'Manage workspace binding',
+    'binding.bind': 'Bind workspace',
+    'binding.unbind': 'Unbind workspace',
+    'binding.current': 'Bound: {title}',
+    'binding.select': 'Choose workspace',
+    'binding.placeholder': 'Select a workspace',
+    'binding.directory': 'Choose another directory…',
+    'binding.hint': 'Tasks move into the selected workspace board and keep this board’s name. Existing tasks in the destination board are kept and merged.',
+    'binding.detachHint': 'Tasks and attachments stay in a standalone board. Task session links are cleared. The workspace, conversations and files stay intact; its empty workspace board remains on Home.',
+    'binding.saved': 'Workspace bound',
+    'binding.detached': 'Workspace unbound. Tasks kept in a standalone board.',
   },
 )
 
@@ -266,6 +286,51 @@ function NewBoardDialog({ open, onClose }) {
         },
       })),
     h('p', { className: 'kbn-detail-note' }, t('board.dirLaterHint'))))
+}
+
+function BoardBindingDialog({ board, workspaces, onClose }) {
+  const [workspaceId, setWorkspaceId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const saving = useRef(false)
+
+  async function save(directory = false) {
+    if (saving.current) return
+    saving.current = true
+    setBusy(true)
+    setError('')
+    try {
+      if (board.bound) await kanbanStore.unbindBoard(board.id)
+      else if (directory) {
+        if (!await pickBoardWorkspace(board)) return
+      } else await kanbanStore.bindBoard(board.id, workspaceId)
+      kanbanStore.toast(t(board.bound ? 'binding.detached' : 'binding.saved'), 'info')
+      onClose()
+    } catch (failure) {
+      setError(messageOf(failure))
+    } finally {
+      saving.current = false
+      setBusy(false)
+    }
+  }
+
+  return h(DshUI.Modal, {
+    open: true, title: t(board.bound ? 'binding.unbind' : 'binding.bind'), closeLabel: t('common.close'),
+    onClose: () => { if (!saving.current) onClose() },
+    footer: [
+      h(DshUI.Button, { key: 'cancel', variant: 'ghost', size: 'sm', disabled: busy, onClick: onClose }, t('common.cancel')),
+      h(DshUI.Button, { key: 'save', variant: 'primary', size: 'sm', loading: busy, disabled: busy || (!board.bound && !workspaceId), onClick: () => save() }, t(board.bound ? 'binding.unbind' : 'binding.bind')),
+    ],
+  }, h('div', { className: 'kbn-project-dialog', 'aria-busy': busy },
+    board.bound ? h('p', { className: 'kbn-binding-path' }, board.path)
+      : h(Fragment, null,
+        h(Field, { label: t('binding.select') }, h(Select, {
+          value: workspaceId, onChange: setWorkspaceId, disabled: busy, ariaLabel: t('binding.select'),
+          options: [{ value: '', label: t('binding.placeholder') }, ...workspaces.map((ws) => ({ value: ws.id, label: (ws.title || ws.id) + (ws.path ? ' · ' + ws.path : '') }))],
+        })),
+        h(DshUI.Button, { variant: 'outline', size: 'sm', disabled: busy, onClick: () => save(true), icon: h(Icon, { name: 'folderOpen', size: 16 }) }, t('binding.directory'))),
+    h('p', { className: 'kbn-detail-note' }, t(board.bound ? 'binding.detachHint' : 'binding.hint')),
+    error && h('p', { className: 'kbn-editor-error', role: 'alert' }, error)))
 }
 
 function useMenuPlacement(open, heightLimit, anchorSelector) {
@@ -650,7 +715,11 @@ function BoardPage(props) {
   const [sendTask, setSendTask] = useState(null)
   const [editor, setEditor] = useState(null)
   const [boardOpen, setBoardOpen] = useState(false)
+  const [bindingOpen, setBindingOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState(null)
+  const [selection, setSelection] = useState({ ids: [], anchorId: null })
+  const [batchBusy, setBatchBusy] = useState(false)
+  const movingTasks = useRef(false)
   const [drag, setDrag] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
   const [busyTaskId, setBusyTaskId] = useState(null)
@@ -674,6 +743,55 @@ function BoardPage(props) {
     if (tasksByStatus[task.status] !== undefined) tasksByStatus[task.status].push(task)
   })
   const selectedTask = selectedTaskId === null ? null : taskById(state, selectedTaskId)
+  const orderedTasks = STATUSES.flatMap((status) => tasksByStatus[status])
+  const selectedTasks = orderedTasks.filter((task) => selection.ids.includes(task.id))
+
+  function clearSelection() {
+    if (movingTasks.current) return
+    setSelection({ ids: [], anchorId: null })
+    setSelectedTaskId(null)
+  }
+
+  function selectTask(task, event) {
+    if (movingTasks.current) return
+    const additive = event?.ctrlKey || event?.metaKey
+    const range = event?.shiftKey
+    const ids = orderedTasks.map((item) => item.id)
+    if (range) {
+      const anchorId = ids.includes(selection.anchorId) ? selection.anchorId : task.id
+      const from = ids.indexOf(anchorId)
+      const to = ids.indexOf(task.id)
+      const rangeIds = ids.slice(Math.min(from, to), Math.max(from, to) + 1)
+      setSelection({ ids: additive ? [...new Set([...selection.ids, ...rangeIds])] : rangeIds, anchorId })
+    } else if (additive) {
+      setSelection({ ids: selection.ids.includes(task.id)
+        ? selection.ids.filter((id) => id !== task.id) : selection.ids.concat(task.id), anchorId: task.id })
+    } else {
+      setSelection({ ids: [task.id], anchorId: task.id })
+    }
+    setSelectedTaskId(additive || range ? null : task.id)
+  }
+
+  // Remove archived/deleted tasks and selections from a previously opened board.
+  useEffect(() => {
+    const live = new Set(boardTasks.map((task) => task.id))
+    setSelection((current) => current.ids.every((id) => live.has(id)) && (!current.anchorId || live.has(current.anchorId))
+      ? current : { ids: current.ids.filter((id) => live.has(id)), anchorId: live.has(current.anchorId) ? current.anchorId : null })
+  }, [activeBoardId, state.tasks])
+
+  async function moveSelected(ids, status, beforeId) {
+    if (movingTasks.current || !ids.length) return
+    movingTasks.current = true
+    setBatchBusy(true)
+    try {
+      await store.moveTasks(ids, status, beforeId)
+    } catch (error) {
+      store.toast(t('toast.failed', { message: messageOf(error) }), 'error')
+    } finally {
+      movingTasks.current = false
+      setBatchBusy(false)
+    }
+  }
 
   // React mounts a new card when it changes columns. Measure its destination
   // before paint, after the host has confirmed the move and the board has reflowed.
@@ -803,6 +921,7 @@ function BoardPage(props) {
     }
     kbnRememberBoard(task.workspaceId)
     setWorkspaceId(task.workspaceId)
+    setSelection({ ids: [id], anchorId: id })
     setSelectedTaskId(id)
   }, [state.revision])
 
@@ -814,12 +933,12 @@ function BoardPage(props) {
       setBoardOpen(true)
       return
     }
-    setSelectedTaskId(null)
+    clearSelection()
     setEditor({ mode: 'create', workspaceId: activeBoardId, status })
   }
 
   function openEdit(task) {
-    setSelectedTaskId(task.id)
+    selectTask(task)
     setEditor({ mode: 'edit', taskId: task.id })
   }
 
@@ -869,9 +988,21 @@ function BoardPage(props) {
     }
   }
 
-  function handleCardDragStart(task) {
-    setDrag({ taskId: task.id })
-    setDropTarget(null)
+  function handleCardDragStart(task, event) {
+    const tasks = selection.ids.includes(task.id) ? selectedTasks : [task]
+    const rect = event.currentTarget.getBoundingClientRect()
+    const heights = new Map(Array.from(workbenchRef.current?.querySelectorAll('.kbn-card') || [])
+      .map((card) => [card.dataset.taskId, card.getBoundingClientRect().height]))
+    // Native dragstart must finish with the source still visible and in place.
+    // Only take it out of layout after the browser begins dispatching dragover.
+    setDrag({ preview: false, taskIds: tasks.map((item) => item.id), height: tasks.reduce((sum, item) => sum + (heights.get(item.id) || rect.height), 0) + (tasks.length - 1) * 8, width: rect.width })
+    if (!selection.ids.includes(task.id)) {
+      setSelection({ ids: [task.id], anchorId: task.id })
+      setSelectedTaskId(null)
+    }
+    const column = tasksByStatus[task.status]
+    const next = column.slice(column.findIndex((item) => item.id === task.id) + 1).find((item) => !tasks.some((selected) => selected.id === item.id))
+    setDropTarget({ status: task.status, beforeId: next?.id || null })
   }
 
   function handleCardDragEnd() {
@@ -882,6 +1013,7 @@ function BoardPage(props) {
   function handleColumnDragOver(event, status) {
     if (drag === null) return
     event.preventDefault()
+    if (!drag.preview) setDrag((current) => current && { ...current, preview: true })
     if (event.dataTransfer !== null && event.dataTransfer !== undefined) event.dataTransfer.dropEffect = 'move'
     if (dropTarget === null || dropTarget.status !== status || dropTarget.beforeId !== null) {
       setDropTarget({ status, beforeId: null })
@@ -889,11 +1021,12 @@ function BoardPage(props) {
   }
 
   function handleCardDragOver(event, task) {
-    if (drag === null || drag.taskId === task.id) return
+    if (drag === null || drag.taskIds.includes(task.id)) return
     event.preventDefault()
     event.stopPropagation()
+    if (!drag.preview) setDrag((current) => current && { ...current, preview: true })
     if (event.dataTransfer !== null && event.dataTransfer !== undefined) event.dataTransfer.dropEffect = 'move'
-    const cards = (tasksByStatus[task.status] || []).filter((item) => item.id !== drag.taskId)
+    const cards = (tasksByStatus[task.status] || []).filter((item) => !drag.taskIds.includes(item.id))
     const index = cards.findIndex((item) => item.id === task.id)
     const rect = event.currentTarget.getBoundingClientRect()
     const below = event.clientY > rect.top + rect.height / 2
@@ -912,28 +1045,56 @@ function BoardPage(props) {
     const target = dropTarget !== null && dropTarget.status === status
       ? dropTarget
       : { status, beforeId: null }
-    const taskId = drag.taskId
+    const taskIds = drag.taskIds
     setDrag(null)
     setDropTarget(null)
-    if (typeof target.beforeId === 'string' && target.beforeId === taskId) return
-    kanbanStore.moveTask(taskId, status, target.beforeId === null ? undefined : target.beforeId).catch((error) => {
+    if (taskIds.includes(target.beforeId)) return
+    if (taskIds.length > 1) {
+      moveSelected(taskIds, status, target.beforeId)
+      return
+    }
+    kanbanStore.moveTask(taskIds[0], status, target.beforeId === null ? undefined : target.beforeId).catch((error) => {
       kanbanStore.toast(t('toast.failed', { message: messageOf(error) }), 'error')
     })
   }
 
   function renderColumn(status) {
     const tasks = tasksByStatus[status] || []
-    const isDropColumn = drag !== null && dropTarget !== null && dropTarget.status === status
+    const isDropColumn = drag?.preview && dropTarget !== null && dropTarget.status === status
     const statusLabel = t('status.' + status)
     const items = []
 
+    // A separate sibling reserves the card's full footprint without changing
+    // the neighboring card's midpoint used to choose before/after insertion.
+    function placeholder(key = 'drop-placeholder') {
+      return h('div', {
+        className: 'kbn-drop-placeholder',
+        key,
+        'aria-hidden': 'true',
+        style: { height: drag.height + 'px' },
+        onDragOver: (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+        },
+        onDrop: (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          handleDrop(status)
+        },
+      })
+    }
+
     tasks.forEach((task) => {
-      const showLine = drag !== null && dropTarget !== null && dropTarget.status === status
-        && dropTarget.beforeId === task.id && drag.taskId !== task.id
+      const showPlaceholder = isDropColumn
+        && dropTarget.beforeId === task.id && !drag.taskIds.includes(task.id)
+      if (showPlaceholder) items.push(placeholder())
       items.push(h('div', {
         className: 'kbn-card-slot',
         key: task.id,
         'data-task-id': task.id,
+        'data-drag-source': drag?.preview && drag.taskIds.includes(task.id) ? 'true' : undefined,
+        style: drag?.preview && drag.taskIds.includes(task.id) ? { width: drag.width + 'px' } : undefined,
         onDragOver: (event) => handleCardDragOver(event, task),
         onDrop: (event) => {
           event.preventDefault()
@@ -941,28 +1102,30 @@ function BoardPage(props) {
           handleDrop(status)
         },
       },
-        showLine ? h('div', { className: 'kbn-drop-line', 'aria-hidden': 'true' }) : null,
         h(TaskCard, {
           task,
           workspace: activeBoard,
-          selected: selectedTaskId === task.id,
-          busy: busyTaskId === task.id,
+          selected: selection.ids.includes(task.id),
+          busy: batchBusy || busyTaskId === task.id,
           onEdit: openEdit,
           onRun: setSendTask,
           onOpenSession: openTaskSession,
           onArchive: handleArchiveTask,
           onDelete: handleDeleteTask,
-          onDragStart: () => handleCardDragStart(task),
+          onDragStart: (event) => handleCardDragStart(task, event),
           onDragEnd: handleCardDragEnd,
-          onSelect: (selected) => setSelectedTaskId(selected.id),
+          onSelect: selectTask,
         })))
     })
 
     if (tasks.length === 0) {
-      items.push(h('div', { className: 'kbn-col-empty', key: 'empty' }, t('board.emptyColumn')))
+      // Keep the hovered empty-state node mounted: replacing it during
+      // dragover can make Chromium cancel a quick drop on the new element.
+      items.push(isDropColumn ? placeholder('empty')
+        : h('div', { className: 'kbn-col-empty', key: 'empty' }, t('board.emptyColumn')))
     }
-    if (drag !== null && dropTarget !== null && dropTarget.status === status && dropTarget.beforeId === null) {
-      items.push(h('div', { className: 'kbn-drop-line', key: 'drop-end', 'aria-hidden': 'true' }))
+    if (tasks.length > 0 && isDropColumn && dropTarget.beforeId === null) {
+      items.push(placeholder())
     }
 
     return h('section', {
@@ -974,17 +1137,20 @@ function BoardPage(props) {
       h('div', { className: 'kbn-col-head' },
         h('span', { className: 'kbn-col-dot', 'data-status': status, 'aria-hidden': 'true' }),
         h('h2', { className: 'kbn-col-title' }, statusLabel),
-        h('span', { className: 'kbn-col-count' }, String(tasks.length)),
-        h('button', {
-          type: 'button',
-          className: 'kbn-col-add',
-          'aria-label': t('board.addToColumn', { status: statusLabel }),
-          title: t('board.addToColumn', { status: statusLabel }),
-          onClick: () => openCreate(status),
-        }, h(Icon, { name: 'plus', size: 14 }))),
+        h('span', { className: 'kbn-col-count' }, String(tasks.length))),
       h('div', {
-        className: cx('kbn-col-body', isDropColumn ? 'kbn-col-drop kbn-drop-target' : null),
+        className: 'kbn-col-body',
         onDragOver: (event) => handleColumnDragOver(event, status),
+        onDragLeave: (event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            // Inserting a placeholder moves the hovered card under the pointer.
+            // Chromium can emit dragleave with no relatedTarget during that reflow.
+            const rect = event.currentTarget.getBoundingClientRect()
+            if (event.clientX >= rect.left && event.clientX < rect.right
+              && event.clientY >= rect.top && event.clientY < rect.bottom) return
+            setDropTarget((target) => target?.status === status ? null : target)
+          }
+        },
         onDrop: (event) => {
           event.preventDefault()
           handleDrop(status)
@@ -1043,7 +1209,15 @@ function BoardPage(props) {
   } else {
     region = h('div', { className: 'kbn-board-region' },
       inlineError,
-      h('div', { className: 'kbn-board' }, STATUSES.map(renderColumn)))
+      h('div', {
+        className: 'kbn-board',
+        onClick: (event) => {
+          if (!event.target.closest('.kbn-card') && !event.ctrlKey && !event.metaKey && !event.shiftKey) clearSelection()
+        },
+        onKeyDown: (event) => {
+          if (event.key === 'Escape' && !drag) { event.preventDefault(); clearSelection() }
+        },
+      }, STATUSES.map(renderColumn)))
   }
 
   return h('div', { className: 'kbn-root' },
@@ -1059,7 +1233,7 @@ function BoardPage(props) {
               boards, board: activeBoard,
               onChange: (next) => {
                 kbnRememberBoard(next)
-                setSelectedTaskId(null)
+                clearSelection()
                 store.openBoard(next)
                 setWorkspaceId(next)
               },
@@ -1067,14 +1241,22 @@ function BoardPage(props) {
           h('p', { className: 'kbn-subtitle' },
             activeBoard !== null
               ? t('board.subtitle', { todo: tasksByStatus.todo.length, doing: tasksByStatus.doing.length, done: tasksByStatus.done.length })
-              : t('board.subtitleEmpty'))),
+              : t('board.subtitleEmpty')),
+          activeBoard && h(DshUI.Button, {
+            variant: 'ghost', size: 'sm', className: 'kbn-board-binding', disabled: state.status !== 'ready',
+            title: activeBoard.path || t('binding.bind'), 'aria-label': t('binding.open'), 'aria-haspopup': 'dialog',
+            onClick: () => setBindingOpen(true), icon: h(Icon, { name: 'workspace', size: 14 }),
+          }, h('span', { className: 'kbn-board-binding-label' }, activeBoard.bound ? t('binding.current', { title: workspaceOf(state, activeBoard.id)?.title || activeBoard.title }) : t('binding.bind')))),
         h('div', { className: 'kbn-head-actions' },
           h(DshUI.Button, {
-            variant: 'ghost', size: 'sm',
+            variant: 'ghost', className: 'kbn-head-settings',
             title: t('settings.open'), 'aria-label': t('settings.open'), 'aria-haspopup': 'dialog',
             onClick: () => openWorkboardSettings(store.ctx),
           }, h(DshUI.IconSettingsOutlineMedium, { size: 16 })),
-          newBoardAction)),
+          activeBoard ? h(Button, {
+            variant: 'primary', icon: h(Icon, { name: 'plus', size: 14 }),
+            disabled: state.status !== 'ready', onClick: () => openCreate('todo'),
+          }, t('board.newTask')) : newBoardAction)),
 
       h('div', {
         className: 'kbn-workbench',
@@ -1106,7 +1288,7 @@ function BoardPage(props) {
           task: selectedTask,
           workspace: activeBoard,
           busy: selectedTask !== null && busyTaskId === selectedTask.id,
-          onClose: () => setSelectedTaskId(null),
+          onClose: clearSelection,
           onEdit: openEdit,
           onRun: setSendTask,
           onOpenSession: openTaskSession,
@@ -1118,6 +1300,7 @@ function BoardPage(props) {
       h(AttachmentPreviewRail, { preview, onClose: () => setPreview(null) }),
 
     sendTask && h(TaskSendDialog, { key: sendTask.id, task: sendTask, onClose: () => setSendTask(null) }),
+    bindingOpen && activeBoard && h(BoardBindingDialog, { board: activeBoard, workspaces: state.workspaces, onClose: () => setBindingOpen(false) }),
     h(TaskEditorDialog, {
       open: editorOpen,
       mode: editor !== null ? editor.mode : 'create',
@@ -1134,7 +1317,7 @@ function BoardPage(props) {
           kbnRememberBoard(board.id)
           store.openBoard(board.id)
           setWorkspaceId(board.id)
-          setSelectedTaskId(null)
+          clearSelection()
         }
       },
     }),

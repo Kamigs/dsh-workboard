@@ -78,9 +78,10 @@ Each note supports up to 4,000 characters. When browser storage is available, un
 
 ## Manage tasks on a board
 
-Use a column's `+` to create a task in that status. The task editor has one content field: put the summary on the first line and details below. You can also set start and due dates, priority, tags, attachments and an assignee.
+Use **New task** at the top right of the page to create a task in To do. The task editor has one content field: put the summary on the first line and details below. You can also set start and due dates, priority, tags, attachments and an assignee.
 
 - Drag cards across columns or reorder them. Status menus in the task details and linked-task panel also move cards.
+- Ctrl/Cmd-click toggles individual cards, Shift-click selects a range, and Ctrl/Cmd-Shift-click adds a range. Drag selected cards together; press Escape or click empty board space to clear the selection.
 - Open a card to view its body, dates, attachments and linked conversation. Drag the divider between the board and details to resize the panel; double-click to reset it. The chosen width is remembered.
 - Select or drop attachments. Images have a large preview and thumbnails; video, audio, text and other files open in the right-hand preview rail.
 

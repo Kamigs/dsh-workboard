@@ -515,6 +515,7 @@ export class KanbanStore {
     this.notes = []
     this.completions = []
     this.workspaceBoardTitles = {}
+    this.boardOrder = []
     /** @type {Map<string, { name: string, type: string, size: number }>} */
     this.attachmentIndex = new Map()
     this.taskCounter = 0
@@ -604,6 +605,8 @@ export class KanbanStore {
     }
     this.boards = boards
     this.boardCounter = highestBoard
+    this.boardOrder = [...new Set((Array.isArray(parsed.boardOrder) ? parsed.boardOrder : [])
+      .filter((id) => typeof id === 'string' && id.trim() !== ''))]
     const noteIds = new Set()
     for (const raw of Array.isArray(parsed.notes) ? parsed.notes : []) {
       try {
@@ -697,12 +700,13 @@ export class KanbanStore {
 
   /** Apply one mutation to a detached draft inside the write queue. */
   async _commitTasks(change) {
-    const draft = structuredClone({ version: 1, boards: this.boards, tasks: this.tasks, workspaceBoardTitles: this.workspaceBoardTitles, notes: this.notes, completions: this.completions })
+    const draft = structuredClone({ version: 1, boards: this.boards, tasks: this.tasks, workspaceBoardTitles: this.workspaceBoardTitles, boardOrder: this.boardOrder, notes: this.notes, completions: this.completions })
     const result = change(draft)
     await writeJsonAtomic(this.stateFile, draft)
     this.tasks = draft.tasks
     this.boards = draft.boards
     this.workspaceBoardTitles = draft.workspaceBoardTitles
+    this.boardOrder = draft.boardOrder
     this.notes = draft.notes
     this.completions = draft.completions
     return result
@@ -794,6 +798,55 @@ export class KanbanStore {
       : ws)
   }
 
+  async getBoardOrder() {
+    await this._ready
+    await this._tail
+    return this.boardOrder.slice()
+  }
+
+  /** Move one card in the shared order, including workspace-backed boards. */
+  async moveBoard(boardId, beforeId, workspaceIds) {
+    return this._changeTasks((draft) => {
+      const ids = [...new Set([...workspaceIds, ...draft.boards.map((board) => board.id)])]
+      if (!ids.includes(boardId) || (beforeId != null && !ids.includes(beforeId))) {
+        throw kanbanError('kanban/board-not-found', 'Board not found.')
+      }
+      const ordered = [...draft.boardOrder.filter((id) => ids.includes(id)), ...ids.filter((id) => !draft.boardOrder.includes(id))]
+      if (boardId !== beforeId) {
+        const next = ordered.filter((id) => id !== boardId)
+        next.splice(beforeId == null ? next.length : next.indexOf(beforeId), 0, boardId)
+        draft.boardOrder = next
+      }
+      return draft.boardOrder.slice()
+    })
+  }
+
+  /** Detach tasks from a workspace without changing the workspace or its sessions. */
+  async unbindBoard(workspace) {
+    return this._changeTasks((draft) => {
+      const now = new Date().toISOString()
+      const board = {
+        id: this._nextBoardId(),
+        title: normalizeTitle(draft.workspaceBoardTitles[workspace.id] || workspace.title || workspace.path),
+        createdAt: now, updatedAt: now,
+      }
+      let migrated = 0
+      for (const task of draft.tasks) {
+        if (task.workspaceId !== workspace.id) continue
+        task.workspaceId = board.id
+        task.sessionId = null
+        task.updatedAt = now
+        migrated++
+      }
+      draft.boards.push(board)
+      delete draft.workspaceBoardTitles[workspace.id]
+      if (draft.boardOrder.includes(workspace.id)) {
+        draft.boardOrder = draft.boardOrder.map((id) => id === workspace.id ? board.id : id).concat(workspace.id)
+      }
+      return { board: cloneTask(board), migrated }
+    })
+  }
+
   /**
    * Bind one standalone board to a workspace directory: its tasks move to the
    * workspace board and the standalone record disappears.
@@ -802,10 +855,17 @@ export class KanbanStore {
    * @returns {Promise<{ boardId: string, workspaceId: string, migrated: number }>}
    */
   async bindBoard(boardId, workspaceId) {
-    return this._changeTasks(({ tasks, boards }) => {
+    return this._changeTasks((draft) => {
+      const { tasks, boards } = draft
       const board = typeof boardId === 'string' ? boards.find((entry) => entry.id === boardId) : undefined
       if (board === undefined) throw kanbanError('kanban/board-not-found', `Board ${String(boardId)} not found.`)
       const target = normalizeWorkspaceId(workspaceId)
+      draft.workspaceBoardTitles[target] = board.title
+      if (draft.boardOrder.includes(board.id)) {
+        draft.boardOrder = draft.boardOrder.filter((id) => id !== target).map((id) => id === board.id ? target : id)
+      } else {
+        draft.boardOrder = draft.boardOrder.filter((id) => id !== board.id)
+      }
       const migrated = tasks.filter((task) => task.workspaceId === board.id)
       for (const task of migrated) {
         task.workspaceId = target
@@ -1002,6 +1062,40 @@ export class KanbanStore {
       if (target !== previousStatus) this._densify(tasks, task.workspaceId, previousStatus)
       task.updatedAt = new Date().toISOString()
       if (previousStatus !== 'done' && target === 'done') completions.push({ taskId: task.id, at: task.updatedAt })
+      return tasks.map(cloneTask)
+    })
+  }
+
+  /** Move live tasks from one board as a single atomic, visually ordered group. */
+  async moveMany(ids, status, beforeId) {
+    return this._changeTasks(({ tasks, completions }) => {
+      if (!Array.isArray(ids) || !ids.length || new Set(ids).size !== ids.length) {
+        throw kanbanError('kanban/invalid-task-selection', 'Select one or more distinct tasks.')
+      }
+      const moving = ids.map((id) => this._requireTask(tasks, id))
+      const workspaceId = moving[0].workspaceId
+      if (moving.some((task) => task.archived || task.workspaceId !== workspaceId)) {
+        throw kanbanError('kanban/invalid-task-selection', 'Selected tasks must be live tasks in the same board.')
+      }
+      const target = normalizeStatus(status)
+      const selected = new Set(ids)
+      moving.sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status)
+        || a.order - b.order || a.createdAt.localeCompare(b.createdAt))
+      const siblings = tasks.filter((task) => task.workspaceId === workspaceId && task.status === target && !selected.has(task.id))
+        .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt))
+      const index = beforeId == null ? siblings.length : siblings.findIndex((task) => task.id === beforeId && !task.archived)
+      if (index < 0) throw kanbanError('kanban/invalid-move-target', 'The insertion target is no longer available.')
+      const now = new Date().toISOString()
+      for (const task of moving) {
+        if (task.status !== 'done' && target === 'done') completions.push({ taskId: task.id, at: now })
+        task.status = target
+        task.updatedAt = now
+      }
+      siblings.splice(index, 0, ...moving)
+      siblings.forEach((task, order) => { task.order = order })
+      for (const column of STATUSES) {
+        if (column !== target) this._densify(tasks, workspaceId, column)
+      }
       return tasks.map(cloneTask)
     })
   }

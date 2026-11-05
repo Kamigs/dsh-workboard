@@ -69,15 +69,18 @@ with `cache-control: no-store`; failures answer non-2xx with
 
 | Method | Path | Body | Result |
 |---|---|---|---|
-| GET | `/api/kanban.state` | — | `{ ok, workspaces, boards, tasks, notes, completions }` |
+| GET | `/api/kanban.state` | — | `{ ok, workspaces, boards, boardOrder, tasks, notes, completions }` |
 | POST | `/api/kanban.note.create` | `{ input: { content, color? } }` | `{ ok, note }` |
 | POST | `/api/kanban.note.update` | `{ id, input: { content, color? } }` | `{ ok, note }` |
 | POST | `/api/kanban.note.delete` | `{ id }` | `{ ok }` |
 | POST | `/api/kanban.board.create` | `{ title }` | `{ ok, board }` |
-| POST | `/api/kanban.board.bind` | `{ boardId, workspaceId }` | `{ ok, boardId, workspaceId, migrated }` |
+| POST | `/api/kanban.board.bind` | `{ boardId, workspaceId }` | state snapshot plus `{ boardId, workspaceId, migrated }` |
+| POST | `/api/kanban.board.unbind` | `{ boardId }` (workspace board) | state snapshot plus `{ board, migrated }` |
+| POST | `/api/kanban.board.move` | `{ boardId, beforeId?: string \| null }` | `{ ok, boardOrder }` |
 | POST | `/api/kanban.task.create` | `{ workspaceId, input }` | `{ ok, task, completions }` |
 | POST | `/api/kanban.task.update` | `{ id, patch }` | `{ ok, task, completions }` |
 | POST | `/api/kanban.task.move` | `{ id, status, beforeId? }` | `{ ok, tasks, completions }` |
+| POST | `/api/kanban.task.moveMany` | `{ ids: string[], status, beforeId? }` | `{ ok, tasks, completions }` |
 | POST | `/api/kanban.board.rename` | `{ boardId, title }` | `{ ok, board: { id, title } }` |
 | POST | `/api/kanban.task.archive` | `{ id }` | `{ ok, task }` |
 | POST | `/api/kanban.task.restore` | `{ id }` | `{ ok, task }` |
@@ -130,6 +133,40 @@ Validation lives in `host/store.js` (title 1–200 chars, description ≤ 20000,
 through one queue and publish atomically (temp file + `fsync` + `rename`); a
 corrupt `state.json` is quarantined as `state.json.corrupt-<timestamp>`.
 
+`boardOrder` persists one shared order for workspace and standalone boards.
+Moving a board inserts it before `beforeId`; omitting it or passing null moves
+the board to the end. Unknown boards return 404. Legacy documents default to
+workspace order followed by standalone boards, and new boards append after the
+saved order. Home supports drag/drop and accessible earlier/later buttons.
+During a drag, CSS grid order previews the insertion and other cards give way.
+The original DOM node stays mounted for native drag events. Cancelling restores
+the saved layout; dropping persists the order, and a failed save restores it.
+
+Task details support Cmd/Ctrl-click to toggle individual cards and Shift-click
+to select a range in column/card order. Cmd/Ctrl-Shift-click adds a range to the
+selection. Plain click selects one card and opens its details; Escape or a click
+on the empty board clears selection. Selected cards are highlighted without
+checkboxes, a selection toolbar or instruction text, and move together by dragging.
+The host validates one live board selection and
+writes the entire move atomically, preserving column/order sequence and recording
+completion events only for tasks newly entering Done. Failure preserves both
+task state and completion history. The target card stays in its original status.
+Native dragstart leaves the source visible and in place so the browser can capture
+its preview. The first dragover removes source cards from the layout and reserves
+their combined height with a dashed rounded placeholder; siblings give way at
+the insertion position.
+
+Board details expose explicit workspace binding below the title, alongside the
+existing first-AI-dispatch binding flow. Binding merges tasks into an existing
+workspace board, keeps the standalone board's display name and saved position,
+and removes its standalone record. Only registered workspaces can be bound.
+Unbinding creates a standalone board with the same title, moving all live and
+archived tasks and clearing their session links. Attachments and completion
+history remain intact. DSH workspaces, sessions and files are untouched; the
+original workspace still contributes an empty board to Home. Binding responses
+include an authoritative snapshot so navigation and migrated task identities
+update together, without an intermediate empty board.
+
 The version-1 state document also contains `notes` and `completions`. Both are
 global to the plugin data directory and use the same serialized atomic write
 queue as tasks and boards. A failed write publishes neither the changed record
@@ -148,8 +185,8 @@ completion events, so deleted task IDs are not reused after restart.
 
 The editor exposes one task-content field. `taskContentFields` and
 `taskContentText` map it to the legacy title/description storage fields while
-preserving paragraph breaks. New cards inherit their column's status; the
-editor does not submit status changes. Details render the body below the name
+preserving paragraph breaks. The board's New task button creates cards in To do;
+the editor does not submit status changes. Details render the body below the name
 without a separate description heading or empty-description placeholder.
 
 Attachments are not stored in the data directory by default: an upload carries
@@ -169,15 +206,17 @@ assigns it to the module-level `kanbanStore` that every component reads.
 ```ts
 interface KanbanStore {
   use(selector, isEqual?)   // useSyncExternalStore selector
-  getSnapshot()             // { status, workspaces, boards, tasks, notes, completions,
+  getSnapshot()             // { status, workspaces, boards, boardOrder, tasks, notes, completions,
                             //   boardId, noteDraft, noteEdits, noteStatus, error, toast, revision, busy }
   subscribe(listener)
   refresh()
   openHome() / openBoard(boardId)
   createBoard(title) / renameBoard(boardId, title) / bindBoard(boardId, workspaceId)
+  unbindBoard(boardId) / moveBoard(boardId, beforeId?)
   createTask(workspaceId, input)
   updateTask(id, patch)
   moveTask(id, status, beforeId?)
+  moveTasks(ids, status, beforeId?)
   archiveTask(id) / restoreTask(id) / deleteTask(id)
   linkSession(id, sessionId, expectedSessionId?) / uploadAttachment(file, workspaceId) / attachmentUrl(id)
   createNote(input) / editNote(id, patch) / flushNote(id) / deleteNote(id)
